@@ -225,7 +225,7 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 		free_task_struct(tsk);
 		return NULL;
 	}
-	tsk->color = 0;
+	/* tsk->color = 0; */
 	
  	err = arch_dup_task_struct(tsk, orig);
 	if (err)
