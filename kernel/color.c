@@ -32,7 +32,44 @@
    error codes -EINVAL for an invalid pid, or 0 on success. 
 */
 SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, int *,retval){
-  return 10;
+  /* check user privilege */
+  /* if (getuid() != 0){ */
+  /*   return -EACCES; */
+  /* } */
+
+  int flag = 0;
+  int i = nr_pids;
+  
+  pid_t iter_pid;
+  u_int16_t iter_color;
+  struct task_struct *iter_task;
+
+  while (--i){
+
+    /* verify each pid_t's pointer */
+    if (copy_from_user(&iter_pid, (pids+i), sizeof(pid_t)))
+      return -EFAULT;
+    /* verify corresponding color pointer */
+    if (copy_from_user(&iter_color, (colors+i), sizeof(u_int16_t)))
+      return -EFAULT;
+
+    /* try to get task by pid */
+    /* start lock */
+    write_lock(&tasklist_lock);
+    iter_task = pid_task(find_vpid(iter_pid),PIDTYPE_PID);
+    /* stop lock */
+    write_unlock(&tasklist_lock);
+    if (!iter_task){
+      retval[i] = -EINVAL;
+      flag = -EINVAL;
+      continue;
+    }
+    
+    /* set color to the task */
+    iter_task->color = iter_color;
+  }
+  
+  return flag;
 }
 
 
@@ -47,22 +84,26 @@ SYSCALL_DEFINE4(get_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, in
   int i = nr_pids;
   pid_t iter_pid;
   struct task_struct *iter_task;
-  while (--i){
+  while (--i >= 0){
     /* verify each pid_t's pointer */
     if (copy_from_user(&iter_pid, (pids+i), sizeof(pid_t)))
       return -EFAULT;
     /* try to get task by pid */
     /* start lock */
-    iter_task = pid_task(find_vpid(iter_pid),PIDTYPE_PID);
-    /* stop lock */
-    if (!iter_task){
+    rcu_read_lock();
+    iter_task = find_task_by_vpid(iter_pid);
+    rcu_read_unlock();
+    if (iter_task){
+      get_task_struct(iter_task);
+      /* copy task->color to color array */
+      if (copy_to_user((colors+i), &(iter_task->color), sizeof(u_int16_t))){ return -EFAULT;}
+      retval[i] = 0;
+    }
+    else{
       retval[i] = -EINVAL;
       flag = -EINVAL;
       continue;
     }
-    retval[i] = 0;
-    if (copy_to_user((colors+i), &(iter_task->color), sizeof(u_int16_t)))
-      return -EFAULT;
   }
   return flag;
 }
