@@ -16,6 +16,7 @@
 #include <linux/delay.h>
 #include <linux/tick.h>
 #include <linux/kallsyms.h>
+#include <linux/cred.h>
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -32,8 +33,9 @@
    error codes -EINVAL for an invalid pid, or 0 on success. 
 */
 SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, int *,retval){
+
   /* check user privilege */
-  /* if (getuid() != 0){ */
+  /* if (current_euid() != 0){ */
   /*   return -EACCES; */
   /* } */
 
@@ -44,8 +46,7 @@ SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, in
   u_int16_t iter_color;
   struct task_struct *iter_task;
 
-  while (--i){
-
+  while (--i >= 0){
     /* verify each pid_t's pointer */
     if (copy_from_user(&iter_pid, (pids+i), sizeof(pid_t)))
       return -EFAULT;
@@ -54,21 +55,19 @@ SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, in
       return -EFAULT;
 
     /* try to get task by pid */
-    /* start lock */
-    write_lock(&tasklist_lock);
+    rcu_read_lock();
     iter_task = pid_task(find_vpid(iter_pid),PIDTYPE_PID);
-    /* stop lock */
-    write_unlock(&tasklist_lock);
-    if (!iter_task){
+    rcu_read_unlock();
+    if (iter_task){
+      get_task_struct(iter_task);
+      iter_task->color = iter_color;
+    }
+    else{
       retval[i] = -EINVAL;
       flag = -EINVAL;
       continue;
     }
-    
-    /* set color to the task */
-    iter_task->color = iter_color;
   }
-  
   return flag;
 }
 
