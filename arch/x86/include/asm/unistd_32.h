@@ -228,7 +228,7 @@
 #define __NR_madvise1		219	/* delete when C lib stub is removed */
 #define __NR_getdents64		220
 #define __NR_fcntl64		221
-/* 223 is unused */
+#define __NR_set_colors 223
 #define __NR_gettid		224
 #define __NR_readahead		225
 #define __NR_setxattr		226
@@ -256,7 +256,7 @@
 #define __NR_io_submit		248
 #define __NR_io_cancel		249
 #define __NR_fadvise64		250
-/* 251 is available for reuse (was briefly sys_set_zone_reclaim) */
+#define __NR_get_colors 	251
 #define __NR_exit_group		252
 #define __NR_lookup_dcookie	253
 #define __NR_epoll_create	254
