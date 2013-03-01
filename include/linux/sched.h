@@ -1417,6 +1417,7 @@ struct task_struct {
 	/* state flags for use by tracers */
 	unsigned long trace;
 #endif
+	u_int16_t color;
 };
 
 /* Future-safe accessor for struct task_struct's cpus_allowed. */
