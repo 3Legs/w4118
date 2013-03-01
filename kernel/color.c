@@ -23,12 +23,46 @@
 #include <asm/timex.h>
 #include <asm/io.h>
 
-SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, int *,retval)
-{
-	return 10;
+
+/* Syscall number 223. nr_pids contains the number of entries in
+   the pids, colors, and the retval arrays. The colors array contains the
+   color to assign to each pid from the corresponding position of
+   the pids array. Returns 0 if all set color requests
+   succeed. Otherwise, The array retval contains per-request
+   error codes -EINVAL for an invalid pid, or 0 on success. 
+*/
+SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, int *,retval){
+  return 10;
 }
 
-SYSCALL_DEFINE4(get_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, int *, retval)
-{
-	return 11;
+
+/* Syscall number 251. Gets the colors of the processes
+   contained in the pids array. Returns 0 if all set color requests
+   succeed. Otherwise, an error code is returned. The array
+   retval contains per-request error codes: -EINVAL for an
+   invalid pid, or 0 on success.
+*/
+SYSCALL_DEFINE4(get_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, int *, retval){
+  int flag = 0;
+  int i = nr_pids;
+  pid_t iter_pid;
+  struct task_struct *iter_task;
+  while (--i){
+    /* verify each pid_t's pointer */
+    if (copy_from_user(&iter_pid, (pids+i), sizeof(pid_t)))
+      return -EFAULT;
+    /* try to get task by pid */
+    /* start lock */
+    iter_task = pid_task(find_vpid(iter_pid),PIDTYPE_PID);
+    /* stop lock */
+    if (!iter_task){
+      retval[i] = -EINVAL;
+      flag = -EINVAL;
+      continue;
+    }
+    retval[i] = 0;
+    if (copy_to_user((colors+i), &(iter_task->color), sizeof(u_int16_t)))
+      return -EFAULT;
+  }
+  return flag;
 }
