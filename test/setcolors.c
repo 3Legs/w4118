@@ -8,7 +8,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#define __NR_get_colors 251
+#define __NR_set_colors 223
 #define PROC_NUMBER 200
 
 struct bind {
@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
 		bind_list[i].pid = -1;
 	}
 	get_bind_list(bind_list);
-	nr_pids = argc-1;
+	nr_pids = (argc)/2;
 	pids = malloc(sizeof(pid_t)*nr_pids);
 	memset(pids,0,sizeof(pid_t)*nr_pids);
 	colors = malloc(sizeof(u_int16_t)*nr_pids);
@@ -53,26 +53,41 @@ int main(int argc, char **argv) {
 			if(bind_list[j].cmdname == NULL) {
 				continue;
 			}
-			if(strcmp(bind_list[j].cmdname, argv[i+1])==0 && bind_list[j].flag == 0) {
+			if(strcmp(bind_list[j].cmdname, argv[2*i+1])==0 && bind_list[j].flag==0) {
 				pids[i] = bind_list[j].pid;
 				bind_list[j].flag = 1;
 				break;
 			}
 		}
 	}
+	
+	for(i=0;i<nr_pids;++i) {
+		int c;
+		if(2*i+2>=argc) {
+			c = -1;
+		}
+		else {
+			c = parse_int(argv[2*i+2]);
+		}
+		if (c == -1) {
+			fprintf(stderr, "Invalid input after %s!\n", argv[2*i+1]);
+			break;
+		}
+		colors[i] = (u_int16_t) c;
+	}
 
-	result = syscall(__NR_get_colors, nr_pids, pids, colors, retval);
- 	for(i=0;i<nr_pids;++i) {
-		if(retval[i]!=-22) {
-			printf("pid: %d     color: %d     retval: %d\n", pids[i], colors[i], retval[i]);
+	result = syscall(__NR_set_colors, i, pids, colors, retval);
+ 	for(j=0;j<i;++j) {
+		if(retval[j]!=-22) {
+			printf("name: %s     pid: %d     color: %d     retval: %d\n", argv[2*j+1], pids[j], colors[j], retval[j]);
 		}
  	}
- 	for(i=0;i<nr_pids;++i) {
-		if(retval[i]==-22) {
-			fprintf(stderr, "Failed to get the color of thread %s!\n", argv[i+1]);
+ 	for(j=0;j<i;++j) {
+		if(retval[j]==-22) {
+			fprintf(stderr, "Failed to set the color of thread %s", argv[2*j+1]);
 		}
  	}
-	return result;
+    return result;
 }
 
 int get_num(int i)
@@ -87,9 +102,10 @@ int get_num(int i)
 
 int parse_int(char *name)
 {
-	int len = strlen(name);
+	int len;
 	int ret = 0;
 	int i;
+	len = strlen(name);
 	for(i=0;i<len;++i) {
 		if(name[i]<48||name[i]>57) {
 			return -1;
