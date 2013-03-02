@@ -33,18 +33,18 @@
    error codes -EINVAL for an invalid pid, or 0 on success. 
 */
 SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, int *,retval){
-
-  /* check user privilege */
-  if (current_euid() != 0){
-    return -EACCES;
-  }
-
   int flag = 0;
   int i = nr_pids;
   
   pid_t iter_pid;
   u_int16_t iter_color;
   struct task_struct *iter_task;
+  struct task_struct *iter_thread;
+
+  /* check user privilege */
+  if (current_euid() != 0){
+    return -EACCES;
+  }
 
   while (--i >= 0){
     /* verify each pid_t's pointer */
@@ -58,9 +58,19 @@ SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, in
     rcu_read_lock();
     iter_task = pid_task(find_vpid(iter_pid),PIDTYPE_PID);
     rcu_read_unlock();
+
     if (iter_task){
       get_task_struct(iter_task);
       iter_task->color = iter_color;
+
+      /* set color to all thread */
+      iter_thread = iter_task;
+      rcu_read_lock();
+      do {
+        get_task_struct(iter_thread);
+        iter_thread->color = iter_color;
+      }while_each_thread(iter_task,iter_thread);
+      rcu_read_unlock();
     }
     else{
       retval[i] = -EINVAL;
