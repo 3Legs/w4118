@@ -39,12 +39,13 @@ SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, in
 
     /* try to get task by pid */
     rcu_read_lock();
-    iter_task = pid_task(find_vpid(iter_pid),PIDTYPE_PID);
+    iter_task = find_task_by_vpid(iter_pid);
     rcu_read_unlock();
 
     if (iter_task){
       get_task_struct(iter_task);
       iter_task->color = iter_color;
+      put_task_struct(iter_task);
       /* set color to all thread */
       rcu_read_lock();
       group_leader = find_task_by_vpid(iter_task->tgid);
@@ -52,6 +53,7 @@ SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, in
       do {
         get_task_struct(iter_thread);
         iter_thread->color = iter_color;
+        put_task_struct(iter_thread);
       }while_each_thread(group_leader,iter_thread);
       rcu_read_unlock();
     }
@@ -88,7 +90,11 @@ SYSCALL_DEFINE4(get_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, in
     if (iter_task){
       get_task_struct(iter_task);
       /* copy task->color to color array */
-      if (copy_to_user((colors+i), &(iter_task->color), sizeof(u_int16_t))){ return -EFAULT;}
+      if (copy_to_user((colors+i), &(iter_task->color), sizeof(u_int16_t))){ 
+        put_task_struct(iter_task);
+        return -EFAULT;
+      }
+      put_task_struct(iter_task);
       retval[i] = 0;
     }
     else{
