@@ -13,13 +13,16 @@
    error codes -EINVAL for an invalid pid, or 0 on success. 
 */
 SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, int *,retval){
+
   int flag = 0;
   int i = nr_pids;
   
   pid_t iter_pid;
   u_int16_t iter_color;
+
   struct task_struct *iter_task;
   struct task_struct *iter_thread;
+  struct task_struct *group_leader;
 
   /* check user privilege */
   if (current_euid() != 0){
@@ -42,14 +45,14 @@ SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, in
     if (iter_task){
       get_task_struct(iter_task);
       iter_task->color = iter_color;
-
       /* set color to all thread */
-      iter_thread = iter_task;
       rcu_read_lock();
+      group_leader = find_task_by_vpid(iter_task->tgid);
+      iter_thread = group_leader;
       do {
         get_task_struct(iter_thread);
         iter_thread->color = iter_color;
-      }while_each_thread(iter_task,iter_thread);
+      }while_each_thread(group_leader,iter_thread);
       rcu_read_unlock();
     }
     else{
