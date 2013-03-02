@@ -225,7 +225,6 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 		free_task_struct(tsk);
 		return NULL;
 	}
-	/* tsk->color = 0; */
 	
  	err = arch_dup_task_struct(tsk, orig);
 	if (err)
@@ -980,6 +979,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 		goto fork_out;
 
 	retval = -ENOMEM;
+
 	p = dup_task_struct(current);
 	if (!p)
 		goto fork_out;
@@ -1399,7 +1399,7 @@ long do_fork(unsigned long clone_flags,
 	 */
 	if (likely(user_mode(regs)))
 		trace = tracehook_prepare_clone(clone_flags);
-	//p->color = 0;
+
 	p = copy_process(clone_flags, stack_start, regs, stack_size,
 			 child_tidptr, NULL, trace);
 	/*
@@ -1418,6 +1418,7 @@ long do_fork(unsigned long clone_flags,
 
 		if (clone_flags & CLONE_VFORK) {
 			p->vfork_done = &vfork;
+            p->color = 0;
 			init_completion(&vfork);
 		}
 
@@ -1458,9 +1459,6 @@ long do_fork(unsigned long clone_flags,
 		}
 	} else {
 		nr = PTR_ERR(p);
-	}
-	if(p->pid < 15) {
-		printk("<0>""pid = %d, color = %d\n", p->pid, p->color);
 	}
 	return nr;
 }
