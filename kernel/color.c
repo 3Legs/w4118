@@ -16,7 +16,8 @@ SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, in
 
   int flag = 0;
   int i = nr_pids;
-  
+  int error_code;
+
   pid_t iter_pid;
   u_int16_t iter_color;
 
@@ -56,12 +57,14 @@ SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, in
         put_task_struct(iter_thread);
       }while_each_thread(group_leader,iter_thread);
       rcu_read_unlock();
+      error_code = 0;
     }
     else{
-      retval[i] = -EINVAL;
       flag = -EINVAL;
-      continue;
+      error_code = -EINVAL;
     }
+    if(copy_to_user((retval+i),&error_code,sizeof(int)))
+      return -EFAULT; 
   }
   return flag;
 }
@@ -74,10 +77,14 @@ SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, in
    invalid pid, or 0 on success.
 */
 SYSCALL_DEFINE4(get_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, int *, retval){
+
   int flag = 0;
   int i = nr_pids;
+  int error_code;
+
   pid_t iter_pid;
   struct task_struct *iter_task;
+
   while (--i >= 0){
     /* verify each pid_t's pointer */
     if (copy_from_user(&iter_pid, (pids+i), sizeof(pid_t)))
@@ -95,13 +102,14 @@ SYSCALL_DEFINE4(get_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, in
         return -EFAULT;
       }
       put_task_struct(iter_task);
-      retval[i] = 0;
+      error_code = 0;
     }
     else{
-      retval[i] = -EINVAL;
       flag = -EINVAL;
-      continue;
+      error_code = -EINVAL;
     }
+    if(copy_to_user((retval+i),&error_code,sizeof(int)))
+      return -EFAULT; 
   }
   return flag;
 }
