@@ -35,9 +35,9 @@
 SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, int *,retval){
 
   /* check user privilege */
-  /* if (current_euid() != 0){ */
-  /*   return -EACCES; */
-  /* } */
+  if (current_euid() != 0){
+    return -EACCES;
+  }
 
   int flag = 0;
   int i = nr_pids;
