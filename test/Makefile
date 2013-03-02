@@ -1,10 +1,10 @@
-APP := getcolors
+APP := setcolors
 ROOT:=$(HOME)
 NDK_PLATFORM_VER := 14
 INSTALL_DIR := /data/tmp
 
-ANDROID_SDK_ROOT:=$(ROOT)/bin/android-sdk-linux
-ANDROID_NDK_ROOT:=$(ROOT)/bin/android-ndk-r8d
+ANDROID_SDK_ROOT:=$(ROOT)/android-sdk-linux
+ANDROID_NDK_ROOT:=$(ROOT)/android-ndk-r8d
 ANDROID_NDK_HOST:=linux-x86
 ANDROID_TARGET:=i686-linux-android
 ANDROID_TARGET_ARCH:=x86
