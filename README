@@ -7,3 +7,95 @@ Workflow:
         1. Always pull 3legs/dev before you start doing something new.
         2. After you're done with something. Commit it with meaningful message (and perhaps merge it to dev if you work on your own branches) locally. Then push it to <YOUR ACCOUNT>.
         3. Send a pull request if others are going to need it through github. Others are responsible to review/test it before merge it into 3Legs/dev.
+
+Notice: 
+Suppose in fact there is only one process corresponds to a given process name(let's take com.example for example). However, if you called:
+# ./setcolors com.example 2 com.example 3
+Then com.example will be colored 2(the first color)
+If in fact there are two processes have the same name com.example and you called:
+# ./setcolors com.example 2 com.example 3
+Then one process is colored 2 and another is colored 3. However, we cannot determine which one is colored 2 or 3, because the command line is ambiguous in itself.
+
+Test programs:
+setcolors:
+usage: ./setcolors <process name 1> <color 1> <process name 2> <color 2> <process name 3> <color 3> ...
+
+setcolor prints the process name, pid, color and retval of each process in the command line.
+If an input error occurs in the command line, setcolors will parse all the processes before the error and print out the process name where the error occur.
+
+example 1(valid input): 
+# ./setcolors /system/bin/sh 1 com.android.email 2 com.android.phone 3
+name: /system/bin/sh     pid: 802     color: 1     retval: 0
+name: com.android.email     pid: 1313     color: 2     retval: 0
+name: com.android.phone     pid: 1144     color: 3     retval: 0
+
+example 2(error after com.android.email):
+# ./setcolors /system/bin/sh 1 com.android.email  com.android.phone 3
+Invalid input after com.android.email!
+name: /system/bin/sh     pid: 802     color: 1     retval: 0
+
+example 3(error after com.android.phone):
+# ./setcolors /system/bin/sh 1 com.android.email 2 com.android.phone 
+Invalid input after com.android.phone!
+name: /system/bin/sh     pid: 802     color: 1     retval: 0
+name: com.android.email     pid: 1313     color: 2     retval: 0
+
+getcolors:
+usage: ./getcolors <process name 1> <process name 2> <process name 3> ...
+
+getcolors prints out the colors of each process together with its pid and retval. If a non-exist process name is fed, it will print out an error message.
+
+example 1(illegal input, com.process.acore not exist):
+# ./getcolors /system/bin/sh com.process.acore com.android.email
+pid: 802     color: 1     retval: 0
+pid: 1313     color: 2     retval: 0
+No such process: com.process.acore!
+
+example 2(correct input):
+# ./getcolors /system/bin/sh android.process.acore com.android.email
+pid: 802     color: 1     retval: 0
+pid: 1125     color: 0     retval: 0
+pid: 1313     color: 2     retval: 0
+
+forktest:
+usage: ./forktest <delay> <fork|vfork|clone> <command>
+
+We didn't distinguish fork and clone, if either is the input, forktest calls fork(). In order to run this test, you need to open two terminals.
+
+Example 1(vfork):
+In terminal A:
+# ./forktest 5 vfork ./forktest 5 fork ./getcolors ./forktest ./forktest ./getcolors
+In terminal B, input the following line immediately:
+# ./setcolors ./forktest 15
+You will see in terminal A:
+pid 1468: sleeping...
+pid 1468: wake up...
+pid 1468: call vfork()
+pid 1470: call ./forktest
+pid 1470: sleeping...
+pid 1470: wake up...
+pid 1470: call fork()
+pid 1471: call ./getcolors
+pid: 1468     color: 15     retval: 0
+pid: 1470     color: 0     retval: 0
+pid: 1471     color: 0     retval: 0
+We can see that the color value is not propagated through vfork().
+
+Example 2(fork):
+In terminal A:
+# ./forktest 5 fork ./forktest 5 fork ./getcolors ./forktest ./forktest ./getcolors
+In terminal B, input the following line immediately:
+# ./setcolors ./forktest 15
+You will see in terminal A:
+pid 1475: sleeping...
+pid 1475: wake up...
+pid 1475: call fork()
+pid 1477: call ./forktest
+pid 1477: sleeping...
+pid 1477: wake up...
+pid 1477: call fork()
+pid 1478: call ./getcolors
+pid: 1475     color: 15     retval: 0
+pid: 1477     color: 15     retval: 0
+pid: 1478     color: 15     retval: 0
+We can see that the color value is propagated through fork().
