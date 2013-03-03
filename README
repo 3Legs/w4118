@@ -1,12 +1,7 @@
-Branches:
-        1. hw2.This is our steady codebase. We will merge the progress into it after we reach each milestone in the homework requirment. No one should commit/push/merge/send-pull-request directly to this branch.
+Git branches:
+        1. hw2.This is our steady codebase. We will merge the progress into it after we reach each milestone in the homework requirment.
         
-        2. dev.This is our development branch. Each member can (only) send a Pull Request from your account to this branch. That means: 1) please do not push to this branch. 2) please do not merge into this branch. 3) only send pull request in order to do code review/comments/discussion.
-
-Workflow:
-        1. Always pull 3legs/dev before you start doing something new.
-        2. After you're done with something. Commit it with meaningful message (and perhaps merge it to dev if you work on your own branches) locally. Then push it to <YOUR ACCOUNT>.
-        3. Send a pull request if others are going to need it through github. Others are responsible to review/test it before merge it into 3Legs/dev.
+        2. dev.This is our development branch. This branch contains every commits that past tests.
 
 Notice: 
 Suppose in fact there is only one process corresponds to a given process name(let's take com.example for example). However, if you called:
@@ -99,3 +94,10 @@ pid: 1475     color: 15     retval: 0
 pid: 1477     color: 15     retval: 0
 pid: 1478     color: 15     retval: 0
 We can see that the color value is propagated through fork().
+
+
+System call design:
+
+1. Instead of copy all the user input array to kernel space, we iterate over it and check the validity of each and everyone of them. It's more secure and eliminate the risk of exhausting kernel heap and illegal memory use over the user space's boundary.
+
+2. We use rcu_read_lock() and rcu_read_unlock() to lock task_list while we are traversing it. We use get_task_struct(task) to atomically increase usage of task while we operates on it and put_task_struct(task) to decrease usage in case that the certain task being killed during the system call.
