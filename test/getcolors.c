@@ -65,7 +65,7 @@ int main(int argc, char **argv) {
 	result = syscall(__NR_get_colors, nr_pids, pids, colors, retval);
  	for(i=0;i<nr_pids;++i) {
 		if(retval[i]!=-22) {
-			printf("pid: %d     color: %d     retval: %d\n", pids[i], colors[i], retval[i]);
+			printf("name: %s     pid: %d     color: %d     retval: %d\n", argv[i+1], pids[i], colors[i], retval[i]);
 		}
  	}
  	for(i=0;i<nr_pids;++i) {
