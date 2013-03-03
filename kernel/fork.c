@@ -225,7 +225,7 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 		free_task_struct(tsk);
 		return NULL;
 	}
-
+	
  	err = arch_dup_task_struct(tsk, orig);
 	if (err)
 		goto out;
@@ -979,6 +979,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 		goto fork_out;
 
 	retval = -ENOMEM;
+
 	p = dup_task_struct(current);
 	if (!p)
 		goto fork_out;
@@ -1417,6 +1418,7 @@ long do_fork(unsigned long clone_flags,
 
 		if (clone_flags & CLONE_VFORK) {
 			p->vfork_done = &vfork;
+            p->color = 0;
 			init_completion(&vfork);
 		}
 

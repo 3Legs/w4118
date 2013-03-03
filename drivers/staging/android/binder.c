@@ -1379,6 +1379,22 @@ binder_transaction(struct binder_proc *proc, struct binder_thread *thread,
 		target_wait = &target_proc->wait;
 	}
 	e->to_proc = target_proc->pid;
+    
+    /* HW_EDIT: 
+
+       Prevent messaging between process with
+       different colors unless either one has
+       color 0
+    */
+    if (proc->tsk->color != 0 &&
+        target_proc->tsk->color != 0 &&
+        proc->tsk->color != target_proc->tsk->color){
+      binder_user_error("binder: %d and %d have different color",
+                        proc->pid, target_proc->pid);
+      return_error = BR_FAILED_REPLY;
+      goto err_color_unmatched;
+    }
+       
 
 	/* TODO: reuse incoming transaction for reply */
 	t = kzalloc(sizeof(*t), GFP_KERNEL);
@@ -1641,6 +1657,7 @@ err_empty_call_stack:
 err_dead_binder:
 err_invalid_target_handle:
 err_no_context_mgr_node:
+err_color_unmatched:
 	if (binder_debug_mask & BINDER_DEBUG_FAILED_TRANSACTION)
 		printk(KERN_INFO "binder: %d:%d transaction failed %d, size"
 				"%zd-%zd\n",
