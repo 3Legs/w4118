@@ -97,6 +97,7 @@ void parse_cmd(struct ft *cmd, int argc, char **argv)
 {
 	if(argc<4) {
 		fprintf(stderr, "To few arguments!\n");
+        printf("Usage: forktest <delay> <fork|vfork|clone> <command line> ...\n");
 		exit(0);
 	}
 	cmd->delay = parse_int(argv[1]);

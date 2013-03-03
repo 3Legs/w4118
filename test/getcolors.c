@@ -32,6 +32,7 @@ int main(int argc, char **argv) {
 	int result;
 	if(argc <= 1) {
 		printf("Too few arguments!\n");
+        printf("Usage: getcolors <proc1 name> <proc2 name> ...\n");
 		exit(0);
 	}
 	bind_list = malloc(sizeof(struct bind)*PROC_NUMBER);
