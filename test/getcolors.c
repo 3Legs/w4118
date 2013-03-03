@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
  	}
  	for(i=0;i<nr_pids;++i) {
 		if(retval[i]==-22) {
-			fprintf(stderr, "Failed to get the color of thread %s!\n", argv[i+1]);
+			fprintf(stderr, "No such process: %s!\n", argv[i+1]);
 		}
  	}
 	return result;

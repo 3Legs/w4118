@@ -84,7 +84,7 @@ int main(int argc, char **argv) {
  	}
  	for(j=0;j<i;++j) {
 		if(retval[j]==-22) {
-			fprintf(stderr, "Failed to set the color of thread %s", argv[2*j+1]);
+			fprintf(stderr, "No such process %s", argv[2*j+1]);
 		}
  	}
     return result;
