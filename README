@@ -55,7 +55,7 @@ pid: 1313     color: 2     retval: 0
 forktest:
 usage: ./forktest <delay> <fork|vfork|clone> <command>
 
-We didn't distinguish fork and clone, if either is the input, forktest calls fork(). In order to run this test, you need to open two terminals.
+In order to run this test, you need to open two terminals.
 
 Example 1(vfork):
 In terminal A:
@@ -95,6 +95,20 @@ pid: 1477     color: 15     retval: 0
 pid: 1478     color: 15     retval: 0
 We can see that the color value is propagated through fork().
 
+Example 3(clone):
+Android don't have clone system call, so we use pthread_create to replace clone system call. By doing this, we want to show that colors are propagated when creating a thread.
+In terminal A:
+# ./forktest 5 clone sleep 5
+In terminal B, input the following line immediately:
+# ./setcolors ./forktest 5
+You will see in terminal A:
+pid 1945: sleeping...
+pid 1945: wake up...
+pid 1945: call clone()
+	name: ./forktest    pid: 1945    tid: 1945    color: 5
+	name: ./forktest    pid: 1945    tid: 1947    color: 5
+
+We can see from the last two lines that the colors are propagated to the threads of a process.
 
 System call design:
 
