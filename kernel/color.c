@@ -59,8 +59,8 @@ SYSCALL_DEFINE4(set_colors, int, nr_pids, pid_t *, pids, u_int16_t *, colors, in
       group_leader = find_task_by_vpid(iter_task->tgid);
       rcu_read_unlock();
       
-      get_task_struct(group_leader);
       if (group_leader){
+        get_task_struct(group_leader);
         iter_thread = group_leader;
         
         rcu_read_lock();
