@@ -332,3 +332,8 @@ ENTRY(sys_call_table)
 	.long sys_dup3			/* 330 */
 	.long sys_pipe2
 	.long sys_inotify_init1
+	/* hw3 */
+	.long sys_net_lock
+	.long sys_net_unlock
+	.long sys_net_lock_wait_timeout 		/* 335 */
+	/* hw3 */

@@ -338,6 +338,11 @@
 #define __NR_dup3		330
 #define __NR_pipe2		331
 #define __NR_inotify_init1	332
+/* hw3 */
+#define __NR_net_lock				333
+#define __NR_net_unlock			334
+#define __NR_net_lock_wait_timeout	335
+/* hw3 */
 
 #ifdef __KERNEL__
 

@@ -204,6 +204,15 @@ typedef struct {
 } atomic64_t;
 #endif
 
+/* hw3 */
+enum __netlock_t {
+	NET_LOCK_USE,
+  NET_LOCK_SLEEP
+};
+
+typedef enum __netlock_t netlock_t;
+/* hw3 */
+
 struct ustat {
 	__kernel_daddr_t	f_tfree;
 	__kernel_ino_t		f_tinode;

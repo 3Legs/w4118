@@ -691,6 +691,11 @@ asmlinkage long sys_ppoll(struct pollfd __user *, unsigned int,
 			  size_t);
 asmlinkage long sys_pipe2(int __user *, int);
 asmlinkage long sys_pipe(int __user *);
+/* hw3 */
+asmlinkage long net_lock(netlock_t type, u_int16_t timeout_val);
+asmlinkage long net_unlock(void);
+asmlinkage long net_lock_wait_timeout(void);
+/* hw3 */
 
 int kernel_execve(const char *filename, char *const argv[], char *const envp[]);
 
