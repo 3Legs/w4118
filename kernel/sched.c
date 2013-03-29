@@ -398,6 +398,15 @@ static inline struct task_group *task_group(struct task_struct *p)
 }
 
 #endif	/* CONFIG_GROUP_SCHED */
+/* EDF-related fields in a runqueue */
+struct edf_rq {
+    struct rb_root task_root;
+    struct rb_node *rb_leftmost;
+
+    struct list_head tasks;
+
+    struct sched_entity *curr, *next, *last;
+}
 
 /* CFS-related fields in a runqueue */
 struct cfs_rq {
@@ -561,6 +570,7 @@ struct rq {
 
 	struct cfs_rq cfs;
 	struct rt_rq rt;
+    struct edf_rq edf;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	/* list of leaf cfs_rq on this cpu: */
