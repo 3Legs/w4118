@@ -1667,6 +1667,7 @@ static void cfs_rq_set_shares(struct cfs_rq *cfs_rq, unsigned long shares)
 #include "sched_stats.h"
 #include "sched_idletask.c"
 #include "sched_fair.c"
+#include "sched_edf.c"
 #include "sched_rt.c"
 #ifdef CONFIG_SCHED_DEBUG
 # include "sched_debug.c"
