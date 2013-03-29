@@ -1418,6 +1418,7 @@ struct task_struct {
 	/* state flags for use by tracers */
 	unsigned long trace;
 #endif
+	 unsigned long netlock_timeout;
 };
 
 /* Future-safe accessor for struct task_struct's cpus_allowed. */
