@@ -4,6 +4,7 @@
 #include <linux/cred.h>
 #include <linux/rwsem.h>
 #include <linux/list.h>
+#include <linux/wait.h>
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -19,6 +20,8 @@ struct user {
    ignored for sleepers. Returns 0 on success and -1 on failure.  
 */
 
+atomic_t first_timeout = ATOMIC_INIT(0);
+
 atomic_t sleeper_pid = ATOMIC_INIT(0);
 struct user user_pids = {
 	.pid = 0,
@@ -28,11 +31,24 @@ struct list_head *user_list = &(user_pids.list);
 DEFINE_SPINLOCK(user_pids_lock);
 
 static DECLARE_RWSEM(netlock);
+static DECLARE_WAIT_QUEUE_HEAD(first);
+
+static void wake_net_sleeper(unsigned long data)
+{
+	if(atomic_read(&first_timeout) != 0) {
+		return;
+	}
+	else {
+		atomic_set(&first_timeout, 1);
+		wake_up(&first);
+	}
+}
 
 SYSCALL_DEFINE2(net_lock, netlock_t, type, u_int16_t, timeout_val) {
 	netlock_t user_sleeper = type;
 	u_int16_t declare_time = timeout_val;
 	int ret;
+	struct timer_list timer;
 
 	if(type == NET_LOCK_USE) {
 		struct user *temp;
@@ -44,6 +60,11 @@ SYSCALL_DEFINE2(net_lock, netlock_t, type, u_int16_t, timeout_val) {
 		}
 		temp->pid = current->pid;
 		list_add(&(temp->list), user_list);
+		init_timer(&timer);
+		timer.expires = jiffies+declare_time*HZ;
+		timer.data = 0;
+		timer.function = wake_net_sleeper;
+		add_timer(&timer);
 		printk(KERN_ALERT "User call net_lock success, pid: %d!\n", temp->pid);
 		goto suc;
 	}
@@ -70,7 +91,7 @@ err:
 }
 
 /* Syscall 334. Release netlock.Return 0
-   on success and -1 on failure.  
+   on success and -1 on failure.
 */
 
 SYSCALL_DEFINE0(net_unlock) {
@@ -118,5 +139,7 @@ err:
 */
 
 SYSCALL_DEFINE0(net_lock_wait_timeout) {
+	atomic_set(&first_timeout, 0);
+	wait_event(first, atomic_read(first_timeout));
 	return 0;
 }
