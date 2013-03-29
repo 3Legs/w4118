@@ -1,3 +1,6 @@
+#define for_each_sched_entity_edf(se) \
+    for (; se; se = NULL)
+
 static inline unsigned long 
 entity_key_edf(struct edf_rq *edf_rq, struct sched_entity *se)
 {
@@ -91,7 +94,7 @@ static void enqueue_task_edf(struct rq *rq, struct task_struct *p,int wakeup)
     struct edf_rq *edf_rq;
     struct sched_entity *se = &p->se;
 
-    if (se) {
+    for_each_sched_entity_edf(se) {
         if (se->on_rq)
             break;
         edf_rq = edf_rq_of(se);
@@ -104,7 +107,7 @@ static void dequeue_task_edf(struct rq *rq, struct task_struct *p, int sleep)
     struct edf_rq *edf_rq;
     struct sched_entity *se = &p->se;
 
-    if (se) {
+    for_each_sched_entity_edf(se) {
         edf_rq = edf_rq_of(se);
         dequeue_entity_edf(edf_rq, se);
     }

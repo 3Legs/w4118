@@ -400,13 +400,15 @@ static inline struct task_group *task_group(struct task_struct *p)
 #endif	/* CONFIG_GROUP_SCHED */
 /* EDF-related fields in a runqueue */
 struct edf_rq {
+	unsigned long nr_running;
+
     struct rb_root task_root;
     struct rb_node *rb_leftmost;
 
     struct list_head tasks;
 
     struct sched_entity *curr, *next, *last;
-}
+};
 
 /* CFS-related fields in a runqueue */
 struct cfs_rq {
@@ -469,6 +471,7 @@ struct cfs_rq {
 	unsigned long rq_weight;
 #endif
 #endif
+
 };
 
 /* Real-Time classes' related field in a runqueue: */

@@ -140,6 +140,7 @@ extern unsigned long nr_iowait(void);
 
 struct seq_file;
 struct cfs_rq;
+struct edf_rq;
 struct task_group;
 #ifdef CONFIG_SCHED_DEBUG
 extern void proc_sched_show_task(struct task_struct *p, struct seq_file *m);
@@ -1095,6 +1096,7 @@ struct sched_entity {
 	/* rq "owned" by this entity/group: */
 	struct cfs_rq		*my_q;
 #endif
+    struct edf_rq       *edf_rq;
 };
 
 struct sched_rt_entity {
