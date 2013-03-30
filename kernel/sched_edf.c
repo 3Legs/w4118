@@ -6,7 +6,7 @@ static const struct sched_class edf_sched_class;
 static inline struct task_struct *
 edf_task_of(struct sched_edf_entity *se)
 {
-    return container_of(se, struct task_struct, se);
+    return container_of(se, struct task_struct, edf_se);
 }
 
 static inline unsigned long 
