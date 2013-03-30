@@ -170,10 +170,10 @@ static const struct sched_class edf_sched_class = {
     .move_one_task = move_one_task_edf,
 #endif
 
-	.set_curr_task          = set_curr_task_edf,
-	.task_tick		= task_tick_edf,
-	.task_new		= task_new_edf,
+	/* .set_curr_task          = set_curr_task_edf, */
+	/* .task_tick		= task_tick_edf, */
+	/* .task_new		= task_new_edf, */
 
-	.prio_changed		= prio_changed_edf,
-	.switched_to		= switched_to_edf,
+	/* .prio_changed		= prio_changed_edf, */
+	/* .switched_to		= switched_to_edf, */
 };
