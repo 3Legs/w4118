@@ -5482,7 +5482,7 @@ int sched_setscheduler_nocheck(struct task_struct *p, int policy,
 	return __sched_setscheduler(p, policy, param, false);
 }
 
-static int
+int
 sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
 {
     if (p) {
