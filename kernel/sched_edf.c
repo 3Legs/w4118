@@ -73,17 +73,22 @@ __dequeue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 static void
 enqueue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
-    account_edf_entity_enqueue(edf_rq, se);
-    if (se != edf_rq->curr)
+
+    if (se != edf_rq->curr) {
         __enqueue_entity_edf(edf_rq, se);
+        account_edf_entity_enqueue(edf_rq, se);
+    }
 }
 
 static void
 dequeue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
-    account_edf_entity_dequeue(edf_rq, se);
-    if (se != edf_rq->curr)
+    if (se != edf_rq->curr) {
         __dequeue_entity_edf(edf_rq, se);
+        account_edf_entity_dequeue(edf_rq, se);
+    }
+    
+
 }
 
 static struct sched_edf_entity *__pick_next_entity_edf(struct edf_rq *edf_rq)
@@ -131,7 +136,7 @@ dequeue_task_edf(struct rq *rq, struct task_struct *p, int sleep)
     if (se)
         dequeue_entity_edf(edf_rq, se);
 
-    printk(KERN_ALERT "Dequeue PID: %d, TOTAL: %l\n", edf_task_of(se)->pid, rq->edf.nr_running);
+    printk(KERN_ALERT "Dequeue PID: %d, TOTAL: %lu\n", edf_task_of(se)->pid, rq->edf.nr_running);
 }
 
 static struct task_struct *pick_next_task_edf(struct rq *rq)
@@ -140,7 +145,7 @@ static struct task_struct *pick_next_task_edf(struct rq *rq)
     struct edf_rq *edf_rq = &rq->edf;
     struct sched_edf_entity *se;
     
-    if (edf_rq->nr_running < 0)
+    if (!edf_rq->nr_running)
         return NULL;
 
     se = pick_next_entity_edf(edf_rq);
