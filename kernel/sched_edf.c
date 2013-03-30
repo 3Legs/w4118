@@ -77,7 +77,7 @@ enqueue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
     if (se != edf_rq->curr) {
         __enqueue_entity_edf(edf_rq, se);
         account_edf_entity_enqueue(edf_rq, se);
-n    }
+    }
 }
 
 static void
