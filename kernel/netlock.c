@@ -140,6 +140,6 @@ err:
 
 SYSCALL_DEFINE0(net_lock_wait_timeout) {
 	atomic_set(&first_timeout, 0);
-	wait_event(first, atomic_read(first_timeout));
+	wait_event(first, atomic_read(&first_timeout));
 	return 0;
 }
