@@ -5488,10 +5488,20 @@ int sched_setscheduler_nocheck(struct task_struct *p, int policy,
 int
 sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
 {
+    int on_rq, running;
+    struct rq *rq;
+    struct edf_rq *edf_rq;
+
     if (p) {
         if (deadline){
             printk(KERN_ALERT "SET TO EDF PID: %d\n", p->pid);
-            p->sched_class = &edf_sched_class;
+            if (p->policy != SCHED_EDF) {
+                p->sched_class = &edf_sched_class;
+                rq = __task_rq_lock(p);
+                running = task_current(rq, p);
+                p->sched_class->switched_to(rq, p);
+                __task_rq_unlock(p);
+            }
             p->edf_se.netlock_timeout = deadline;
         } else {
             printk(KERN_ALERT "SET TO FAIR PID: %d\n", p->pid);
