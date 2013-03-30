@@ -1031,6 +1031,16 @@ struct load_weight {
 };
 
 /*
+ * EDF stats for a schedulable entity
+ *
+ */
+struct sched_edf_entity {
+    struct rb_node run_node;
+    unsigned int on_rq;
+    unsigned long netlock_timeout;
+};
+
+/*
  * CFS stats for a schedulable entity (task, task-group etc)
  *
  * Current field usage histogram:
@@ -1045,7 +1055,6 @@ struct sched_entity {
 	struct rb_node		run_node;
 	struct list_head	group_node;
 	unsigned int		on_rq;
-    unsigned long       netlock_timeout; /* for netlock */
 
 	u64			exec_start;
 	u64			sum_exec_runtime;
@@ -1096,7 +1105,6 @@ struct sched_entity {
 	/* rq "owned" by this entity/group: */
 	struct cfs_rq		*my_q;
 #endif
-    struct edf_rq       *edf_rq;
 };
 
 struct sched_rt_entity {
@@ -1135,6 +1143,7 @@ struct task_struct {
 	const struct sched_class *sched_class;
 	struct sched_entity se;
 	struct sched_rt_entity rt;
+    struct sched_edf_entity edf_se;
 
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	/* list of struct preempt_notifier: */

@@ -407,7 +407,7 @@ struct edf_rq {
 
     struct list_head tasks;
 
-    struct sched_entity *curr, *next, *last;
+    struct sched_edf_entity *curr, *next, *last;
 };
 
 /* CFS-related fields in a runqueue */
@@ -8266,6 +8266,12 @@ int in_sched_functions(unsigned long addr)
 		&& addr < (unsigned long)__sched_text_end);
 }
 
+static void init_edf_rq(struct edf_rq *edf_rq, struct rq *rq)
+{
+    edf_rq->task_root = RB_ROOT;
+    INIT_LIST_HEAD(&edf_rq->tasks);
+}
+
 static void init_cfs_rq(struct cfs_rq *cfs_rq, struct rq *rq)
 {
 	cfs_rq->tasks_timeline = RB_ROOT;
@@ -8455,6 +8461,7 @@ void __init sched_init(void)
 		rq->nr_running = 0;
 		init_cfs_rq(&rq->cfs, rq);
 		init_rt_rq(&rq->rt, rq);
+        init_edf_rq(&rq->edf, rq);
 #ifdef CONFIG_FAIR_GROUP_SCHED
 		init_task_group.shares = init_task_group_load;
 		INIT_LIST_HEAD(&rq->leaf_cfs_rq_list);
