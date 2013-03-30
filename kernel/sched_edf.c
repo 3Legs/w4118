@@ -149,6 +149,21 @@ static void put_prev_task_edf(struct rq *rq, struct task_struct *prev)
 static void 
 check_preempt_edf(struct rq *rq, struct task_struct *p, int sync)
 {
+    struct task_struct *curr = rq->curr;
+    struct sched_edf_entity *se = &curr->se, *pse = &p->edf_se;
+    struct edf_rq *edf_rq = &rq->edf;
+
+    if (unlikely(curr == p))
+        return;
+
+    if (p->policy == SCHED_EDF) {
+        if (entity_key_edf(pse) < entity_key_edf(se)) {
+            /* new task has a earlier deadline */
+            printk(KERN_ALERT
+                   "RESCHED: Curr PID: %d, T: %lu, New PID: %d, T: %lu\n", curr->pid, entity_key_edf(se), p->pid, entity_key_edf(pse));
+            resched_task(curr);
+        }
+    }
 }
 
 static void 
@@ -174,6 +189,10 @@ static void
 switched_to_edf (struct rq *this_rq, struct task_struct *task,
                      int running)
 {
+    if (running) 
+        resched_task(this_rq->curr);
+    else
+        check_preempt_curr_edf(this_rq, task, 0);
 }
 
 static void 
