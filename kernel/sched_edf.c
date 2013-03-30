@@ -140,7 +140,7 @@ dequeue_task_edf(struct rq *rq, struct task_struct *p, int sleep)
 }
 
 static void
-set_next_entity(struct edf_rq *edf_rq, struct sched_edf_entity *se)
+set_next_edf_entity(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
     edf_rq->curr = se;
 }
