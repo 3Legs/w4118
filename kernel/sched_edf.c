@@ -234,10 +234,12 @@ switched_to_edf (struct rq *this_rq, struct task_struct *task,
     printk(KERN_ALERT "PID: %d switch to EDF", task->pid);
     if (running) {
         printk(KERN_ALERT " and it's running\n");
-      } else {
+    } else {
         printk(KERN_ALERT " and it's not running\n");
-      }
-      check_preempt_curr_edf(this_rq, task, 0);
+    }
+
+    enqueue_task_edf(this_rq, task);
+    check_preempt_curr_edf(this_rq, task, 0);
 }
 
 static void 
