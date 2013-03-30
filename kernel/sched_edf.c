@@ -211,11 +211,6 @@ static void task_new_edf (struct rq *rq, struct task_struct *p)
 {
 }
 
-/* static void  */
-/* switched_from_edf (struct rq *this_rq, struct task_struct *task, int running) */
-/* { */
-/* } */
-
 static void 
 switched_to_edf (struct rq *this_rq, struct task_struct *task,
                      int running)
