@@ -143,6 +143,37 @@ check_preempt_edf(struct rq *rq, struct task_struct *p, int sync)
 {
 }
 
+static void 
+set_curr_task_edf (struct rq *rq)
+{
+}
+
+static void
+task_tick_edf (struct rq *rq, struct task_struct *p, int queued)
+{
+}
+
+static void task_new_edf (struct rq *rq, struct task_struct *p)
+{
+}
+
+static void 
+switched_from_edf (struct rq *this_rq, struct task_struct *task, int running)
+{
+}
+
+static void 
+switched_to_edf (struct rq *this_rq, struct task_struct *task,
+                     int running)
+{
+}
+
+static void 
+prio_changed_edf (struct rq *this_rq, struct task_struct *task,
+                      int oldprio, int running)
+{
+}
+
 static const struct sched_class edf_sched_class = {
     .next = &fair_sched_class,
     .enqueue_task = enqueue_task_edf,
@@ -161,10 +192,10 @@ static const struct sched_class edf_sched_class = {
     .move_one_task = move_one_task_edf,
 #endif
 
-	/* .set_curr_task          = set_curr_task_edf, */
-	/* .task_tick		= task_tick_edf, */
-	/* .task_new		= task_new_edf, */
+	.set_curr_task          = set_curr_task_edf,
+	.task_tick		= task_tick_edf,
+	.task_new		= task_new_edf,
 
-	/* .prio_changed		= prio_changed_edf, */
-	/* .switched_to		= switched_to_edf, */
+	.prio_changed		= prio_changed_edf,
+	.switched_to		= switched_to_edf,
 };
