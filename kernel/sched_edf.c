@@ -100,7 +100,7 @@ enqueue_task_edf(struct rq *rq, struct task_struct *p,int wakeup)
     if (se)
         enqueue_entity_edf(edf_rq, se);
 
-    printk(KERN_ALERT "Enqueue PID: %d, TOTAL: %d\n", edf_task_of(se)->pid, rq->edf.nr_running);
+    printk(KERN_ALERT "Enqueue PID: %d, TOTAL: %lu\n", edf_task_of(se)->pid, rq->edf.nr_running);
 }
 
 static void 
@@ -112,7 +112,7 @@ dequeue_task_edf(struct rq *rq, struct task_struct *p, int sleep)
     if (se)
         dequeue_entity_edf(edf_rq, se);
 
-    printk(KERN_ALERT "Dequeue PID: %d, TOTAL: %d\n", edf_task_of(se)->pid, rq->edf.nr_running);
+    printk(KERN_ALERT "Dequeue PID: %d, TOTAL: %lu\n", edf_task_of(se)->pid, rq->edf.nr_running);
 }
 
 static struct task_struct *pick_next_task_edf(struct rq *rq)
@@ -128,7 +128,7 @@ static struct task_struct *pick_next_task_edf(struct rq *rq)
 
     p = edf_task_of(se);
 
-    printk(KERN_ALERT "Pick PID: %d, TOTAL: %d\n", p->pid, edf_rq->nr_running);
+    printk(KERN_ALERT "Pick PID: %d, TOTAL: %lu\n", p->pid, edf_rq->nr_running);
     return p;
 }
 
@@ -143,24 +143,24 @@ static void put_prev_task_edf(struct rq *rq, struct task_struct *prev)
         put_prev_entity_edf(edf_rq, se);
     }
 
-    printk(KERN_ALERT "Pick PID: %d\n", prev->pid);
+    printk(KERN_ALERT "Put PID: %d\n", prev->pid);
 }
 
 static void 
-check_preempt_edf(struct rq *rq, struct task_struct *p, int sync)
+check_preempt_curr_edf(struct rq *rq, struct task_struct *p, int sync)
 {
     struct task_struct *curr = rq->curr;
-    struct sched_edf_entity *se = &curr->se, *pse = &p->edf_se;
+    struct sched_edf_entity *se = &curr->edf_se, *pse = &p->edf_se;
     struct edf_rq *edf_rq = &rq->edf;
 
     if (unlikely(curr == p))
         return;
 
     if (p->policy == SCHED_EDF) {
-        if (entity_key_edf(pse) < entity_key_edf(se)) {
+        if (entity_key_edf(edf_rq, pse) < entity_key_edf(edf_rq, se)) {
             /* new task has a earlier deadline */
             printk(KERN_ALERT
-                   "RESCHED: Curr PID: %d, T: %lu, New PID: %d, T: %lu\n", curr->pid, entity_key_edf(se), p->pid, entity_key_edf(pse));
+                   "RESCHED: Curr PID: %d, T: %lu, New PID: %d, T: %lu\n", curr->pid, entity_key_edf(edf_rq, se), p->pid, entity_key_edf(edf_rq, pse));
             resched_task(curr);
         }
     }
@@ -180,10 +180,10 @@ static void task_new_edf (struct rq *rq, struct task_struct *p)
 {
 }
 
-static void 
-switched_from_edf (struct rq *this_rq, struct task_struct *task, int running)
-{
-}
+/* static void  */
+/* switched_from_edf (struct rq *this_rq, struct task_struct *task, int running) */
+/* { */
+/* } */
 
 static void 
 switched_to_edf (struct rq *this_rq, struct task_struct *task,
@@ -207,7 +207,7 @@ static const struct sched_class edf_sched_class = {
     .dequeue_task = dequeue_task_edf,
     .yield_task = yield_task_fair,
 
-    .check_preempt_curr = check_preempt_edf,
+    .check_preempt_curr = check_preempt_curr_edf,
 
     .pick_next_task = pick_next_task_edf,
     .put_prev_task = put_prev_task_edf,
