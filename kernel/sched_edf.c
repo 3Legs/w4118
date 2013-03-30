@@ -77,7 +77,7 @@ enqueue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
     if (se != edf_rq->curr) {
         __enqueue_entity_edf(edf_rq, se);
         account_edf_entity_enqueue(edf_rq, se);
-    }
+n    }
 }
 
 static void
@@ -110,7 +110,7 @@ static struct sched_edf_entity *pick_next_entity_edf(struct edf_rq *edf_rq)
 static void 
 put_prev_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
-    /* edf_rq->curr = NULL; */
+    edf_rq->curr = NULL;
 }
 
 static void 
