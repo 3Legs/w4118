@@ -66,8 +66,7 @@ enqueue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 static void
 dequeue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
-    if (se != edf_rq->curr)
-        __dequeue_entity_edf(edf_rq, se);
+    __dequeue_entity_edf(edf_rq, se);
 }
 
 static struct sched_edf_entity *__pick_next_entity_edf(struct edf_rq *edf_rq)
@@ -100,7 +99,7 @@ enqueue_task_edf(struct rq *rq, struct task_struct *p,int wakeup)
     if (se)
         enqueue_entity_edf(edf_rq, se);
 
-    printk(KERN_ALERT "Enqueue PID: %d\n", edf_task_of(se));
+    printk(KERN_ALERT "Enqueue PID: %d\n", edf_task_of(se)->pid);
 }
 
 static void 
@@ -112,7 +111,7 @@ dequeue_task_edf(struct rq *rq, struct task_struct *p, int sleep)
     if (se)
         dequeue_entity_edf(edf_rq, se);
 
-    printk(KERN_ALERT "Dequeue PID: %d\n", edf_task_of(se));
+    printk(KERN_ALERT "Dequeue PID: %d\n", edf_task_of(se)->pid);
 }
 
 static struct task_struct *pick_next_task_edf(struct rq *rq)
