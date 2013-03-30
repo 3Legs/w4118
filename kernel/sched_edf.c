@@ -110,7 +110,7 @@ static struct sched_edf_entity *pick_next_entity_edf(struct edf_rq *edf_rq)
 static void 
 put_prev_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
-    edf_rq->curr = NULL;
+    /* edf_rq->curr = NULL; */
 }
 
 static void 
@@ -216,10 +216,13 @@ switched_to_edf (struct rq *this_rq, struct task_struct *task,
                      int running)
 {
     printk(KERN_ALERT "PID: %d switch to EDF", task->pid);
-    if (running) 
+    if (running) {
+        printk(KERN_ALERT " and it's running\n");
         resched_task(this_rq->curr);
-    else
+    } else {
+        printk(KERN_ALERT " and it's not running\n");
         check_preempt_curr_edf(this_rq, task, 0);
+    }
 }
 
 static void 
