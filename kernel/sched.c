@@ -5309,6 +5309,8 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
 
     if (policy == SCHED_EDF) {
         p->edf_se.netlock_timeout = (unsigned long)prio;
+        printk(KERN_ALERT 
+               "Set deadline PID: %d, T: %lu \n", p->pid, p->edf_se.netlock_timeout);
     } else {
         p->rt_priority = prio;
         p->normal_prio = normal_prio(p);
