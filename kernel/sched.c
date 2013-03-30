@@ -5303,19 +5303,11 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
 	case SCHED_RR:
 		p->sched_class = &rt_sched_class;
 		break;
-    case SCHED_EDF:
-        p->sched_class = &edf_sched_class;
-        break;
 	}
-    if (policy == SCHED_EDF) {
-        p->edf_se.netlock_timeout = (unsigned long) prio;
-        printk(KERN_ALERT "PID: %d has deadline: %lu\n", p->pid, p->edf_se.netlock_timeout);
-    } else {
-        p->rt_priority = prio;
-        p->normal_prio = normal_prio(p);
-        /* we are holding p->pi_lock already */
-        p->prio = rt_mutex_getprio(p);
-    }
+    p->rt_priority = prio;
+    p->normal_prio = normal_prio(p);
+    /* we are holding p->pi_lock already */
+    p->prio = rt_mutex_getprio(p);
 
 	set_load_weight(p);
 }
@@ -5352,21 +5344,19 @@ recheck:
 		policy = oldpolicy = p->policy;
 	else if (policy != SCHED_FIFO && policy != SCHED_RR &&
 			policy != SCHED_NORMAL && policy != SCHED_BATCH &&
-			policy != SCHED_IDLE && policy != SCHED_EDF)
+			policy != SCHED_IDLE)
 		return -EINVAL;
 	/*
 	 * Valid priorities for SCHED_FIFO and SCHED_RR are
 	 * 1..MAX_USER_RT_PRIO-1, valid priority for SCHED_NORMAL,
 	 * SCHED_BATCH and SCHED_IDLE is 0.
 	 */
-    if (!unlikely(policy == SCHED_EDF)) {
-        if (param->sched_priority < 0 ||
-            (p->mm && param->sched_priority > MAX_USER_RT_PRIO-1) ||
-            (!p->mm && param->sched_priority > MAX_RT_PRIO-1))
-            return -EINVAL;
-        if (rt_policy(policy) != (param->sched_priority != 0))
-            return -EINVAL;
-    }
+    if (param->sched_priority < 0 ||
+        (p->mm && param->sched_priority > MAX_USER_RT_PRIO-1) ||
+        (!p->mm && param->sched_priority > MAX_RT_PRIO-1))
+        return -EINVAL;
+    if (rt_policy(policy) != (param->sched_priority != 0))
+        return -EINVAL;
 
 	/*
 	 * Allow unprivileged RT tasks to decrease priority:
@@ -5490,6 +5480,17 @@ int sched_setscheduler_nocheck(struct task_struct *p, int policy,
 			       struct sched_param *param)
 {
 	return __sched_setscheduler(p, policy, param, false);
+}
+
+static int
+sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
+{
+    if (p) {
+        p->edf_se.netlock_timeout = deadline;
+        return 0;
+    }
+    
+    return -EINVAL;
 }
 
 static int
