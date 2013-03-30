@@ -76,8 +76,8 @@ enqueue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 
     if (se != edf_rq->curr) {
         __enqueue_entity_edf(edf_rq, se);
-        account_edf_entity_enqueue(edf_rq, se);
     }
+    account_edf_entity_enqueue(edf_rq, se);
 }
 
 static void
@@ -85,10 +85,8 @@ dequeue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
     if (se != edf_rq->curr) {
         __dequeue_entity_edf(edf_rq, se);
-        account_edf_entity_dequeue(edf_rq, se);
     }
-    
-
+    account_edf_entity_dequeue(edf_rq, se);
 }
 
 static struct sched_edf_entity *__pick_next_entity_edf(struct edf_rq *edf_rq)
