@@ -137,7 +137,7 @@ dequeue_task_edf(struct rq *rq, struct task_struct *p, int sleep)
     if (se)
         dequeue_entity_edf(edf_rq, se);
 
-    printk(KERN_ALERT "Dequeue PID: %d, TOTAL: %lu\n", edf_task_of(se)->pid, rq->edf.nr_running);
+    printk(KERN_ALERT "Dequeue PID: %d, TOTAL: %lu BECAUSE OF %d\n", edf_task_of(se)->pid, rq->edf.nr_running, sleep);
 }
 
 static void
@@ -174,13 +174,13 @@ static struct task_struct *pick_next_task_edf(struct rq *rq)
 static void put_prev_task_edf(struct rq *rq, struct task_struct *prev)
 {
     /* nothing to be account for a EDF scheduling */
-    struct sched_edf_entity *se = &prev->edf_se;
-    struct edf_rq *edf_rq;
+    /* struct sched_edf_entity *se = &prev->edf_se; */
+    /* struct edf_rq *edf_rq; */
     
-    if (se) {
-        edf_rq = &rq->edf;
-        put_prev_entity_edf(edf_rq, se);
-    }
+    /* if (se) { */
+    /*     edf_rq = &rq->edf; */
+    /*     put_prev_entity_edf(edf_rq, se); */
+    /* } */
 
     printk(KERN_ALERT "Put PID: %d\n", prev->pid);
 }
