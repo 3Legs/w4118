@@ -59,10 +59,8 @@ __dequeue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 static void
 enqueue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
-    if (se != edf_rq->curr) {
-        __enqueue_entity_edf(edf_rq, se);
-        edf_rq->nr_running++;
-    }
+    __enqueue_entity_edf(edf_rq, se);
+    edf_rq->nr_running++;
 }
 
 static void
