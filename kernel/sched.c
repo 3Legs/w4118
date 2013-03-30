@@ -5303,12 +5303,19 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
 	case SCHED_RR:
 		p->sched_class = &rt_sched_class;
 		break;
+    case SCHED_EDF:
+        p->sched_class = &edf_sched_class;
+        break;
 	}
-
-    p->rt_priority = prio;
-    p->normal_prio = normal_prio(p);
-    /* we are holding p->pi_lock already */
-    p->prio = rt_mutex_getprio(p);
+    if (policy == SCHED_EDF) {
+        p->edf_se.netlock_timeout = (unsigned long) prio;
+        printk(KERN_ALERT "PID: %d has deadline: %lu\n", p->pid, p->edf_se.netlock_timeout);
+    } else {
+        p->rt_priority = prio;
+        p->normal_prio = normal_prio(p);
+        /* we are holding p->pi_lock already */
+        p->prio = rt_mutex_getprio(p);
+    }
 
 	set_load_weight(p);
 }
@@ -5345,7 +5352,7 @@ recheck:
 		policy = oldpolicy = p->policy;
 	else if (policy != SCHED_FIFO && policy != SCHED_RR &&
 			policy != SCHED_NORMAL && policy != SCHED_BATCH &&
-			policy != SCHED_IDLE)
+			policy != SCHED_IDLE && policy != SCHED_EDF)
 		return -EINVAL;
 	/*
 	 * Valid priorities for SCHED_FIFO and SCHED_RR are
