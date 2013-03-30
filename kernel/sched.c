@@ -5303,20 +5303,13 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
 	case SCHED_RR:
 		p->sched_class = &rt_sched_class;
 		break;
-    case SCHED_EDF:
-        p->sched_class = &edf_sched_class;
 	}
 
-    if (policy == SCHED_EDF) {
-        p->edf_se.netlock_timeout = (unsigned long)prio;
-        printk(KERN_ALERT 
-               "Set deadline PID: %d, T: %lu \n", p->pid, p->edf_se.netlock_timeout);
-    } else {
-        p->rt_priority = prio;
-        p->normal_prio = normal_prio(p);
-        /* we are holding p->pi_lock already */
-        p->prio = rt_mutex_getprio(p);
-    }
+    p->rt_priority = prio;
+    p->normal_prio = normal_prio(p);
+    /* we are holding p->pi_lock already */
+    p->prio = rt_mutex_getprio(p);
+
 	set_load_weight(p);
 }
 
