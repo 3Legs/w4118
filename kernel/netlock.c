@@ -9,6 +9,7 @@
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
 
+
 struct user {
 	int pid;
 	struct list_head list;
@@ -46,26 +47,39 @@ static void wake_net_sleeper(unsigned long data)
 
 SYSCALL_DEFINE2(net_lock, netlock_t, type, u_int16_t, timeout_val) {
 	netlock_t user_sleeper = type;
-	u_int16_t declare_time = timeout_val;
+	u_int16_t deadline = jiffies + timeout_val * HZ;
 	int ret;
-	struct timer_list timer;
+	struct timer_list *timer;
+	struct sched_param *param;
+	param = kmalloc(sizeof(struct sched_param), GFP_KERNEL);
+	param->sched_priority = (int) deadline;
+
 
 	if(type == NET_LOCK_USE) {
 		struct user *temp;
-		down_read(&netlock);
 		temp = kmalloc(sizeof(struct user), GFP_KERNEL);
 		if(!temp) {
 			printk(KERN_ALERT "Error in kmalloc!\n");
 			return -ENOMEM;
 		}
 		temp->pid = current->pid;
+		timer = kmalloc(sizeof(struct timer_list), GFP_KERNEL);
+		if(!timer) {
+			printk(KERN_ALERT "Error in kmalloc!\n");
+			return -ENOMEM;
+		}
+		init_timer(timer);
+		timer->expires = deadline;
+		timer->data = 0;
+		timer->function = wake_net_sleeper;
+		add_timer(timer);
+		down_read(&netlock);
 		list_add(&(temp->list), user_list);
-		init_timer(&timer);
-		timer.expires = jiffies+declare_time*HZ;
-		timer.data = 0;
-		timer.function = wake_net_sleeper;
-		add_timer(&timer);
+		printk(KERN_ALERT "A\n");
+		ret = sched_setscheduler_edf(current, deadline);
+		printk(KERN_ALERT "B\n");
 		printk(KERN_ALERT "User call net_lock success, pid: %d!\n", temp->pid);
+		printk(KERN_ALERT "Return value: %d, Deadline: %lu pid: %d\n", ret, current->edf_se.netlock_timeout, current->pid);
 		goto suc;
 	}
 	else if(type == NET_LOCK_SLEEP) {
@@ -110,7 +124,7 @@ SYSCALL_DEFINE0(net_unlock) {
 	list_for_each_entry_safe(cur, next, user_list, list) {
 		if(cur->pid == current->pid) {
 			printk(KERN_ALERT "In list_for_each_entry_safe, deleting pid: %d!\n", cur->pid);
-			up_write(&netlock);
+			up_read(&netlock);
 			list_del(&(cur->list));
 			flag = 1;
 			goto label0;
