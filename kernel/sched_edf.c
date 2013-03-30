@@ -108,9 +108,12 @@ static struct sched_edf_entity *pick_next_entity_edf(struct edf_rq *edf_rq)
 }
 
 static void 
-put_prev_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
+put_prev_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *prev)
 {
-    /* edf_rq->curr = NULL; */
+    if (prev->on_rq) {
+        __enqueue_entity_edf(edf_rq, prev);
+    }
+    edf_rq->curr = NULL;
 }
 
 static void 
