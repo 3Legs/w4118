@@ -238,7 +238,7 @@ switched_to_edf (struct rq *this_rq, struct task_struct *task,
         printk(KERN_ALERT " and it's not running\n");
     }
 
-    enqueue_task_edf(this_rq, task);
+    enqueue_task_edf(this_rq, task, 0);
     check_preempt_curr_edf(this_rq, task, 0);
 }
 
