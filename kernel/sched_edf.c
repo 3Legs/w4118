@@ -110,7 +110,7 @@ static struct sched_edf_entity *pick_next_entity_edf(struct edf_rq *edf_rq)
 static void 
 put_prev_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
-    edf_rq->curr = NULL;
+    /* edf_rq->curr = NULL; */
 }
 
 static void 
@@ -152,10 +152,10 @@ static struct task_struct *pick_next_task_edf(struct rq *rq)
     struct sched_edf_entity *se;
     
     if (!edf_rq->nr_running) {
-        printk(KERN_ALERT "Nothing left for EDF\n");
         return NULL;
     }
 
+    printk(KERN_ALERT "EDF has %lu tasks left \n", edf_rq->nr_running);
     se = pick_next_entity_edf(edf_rq);
     if (se)
         set_next_edf_entity(edf_rq, se);
