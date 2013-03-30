@@ -89,35 +89,26 @@ static struct sched_edf_entity *pick_next_entity_edf(struct edf_rq *edf_rq)
 static void 
 put_prev_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
-    edf_rq->curr = NULL;
 }
 
 static void 
 enqueue_task_edf(struct rq *rq, struct task_struct *p,int wakeup)
 {
-    struct edf_rq *edf_rq;
+    struct edf_rq *edf_rq = &rq->edf;
     struct sched_edf_entity *se = &p->edf_se;
-
-    for_each_sched_entity_edf(se) {
-        if (se->on_rq)
-            break;
-        se->on_rq = 1;
-        edf_rq = &rq->edf;
+    
+    if (se)
         enqueue_entity_edf(edf_rq, se);
-    }
 }
 
 static void 
 dequeue_task_edf(struct rq *rq, struct task_struct *p, int sleep)
 {
-    struct edf_rq *edf_rq;
+    struct edf_rq *edf_rq = &rq->edf;
     struct sched_edf_entity *se = &p->edf_se;
 
-    for_each_sched_entity_edf(se) {
-        edf_rq = &rq->edf;
-        se->on_rq = 0;
+    if (se)
         dequeue_entity_edf(edf_rq, se);
-    }
 }
 
 static struct task_struct *pick_next_task_edf(struct rq *rq)
