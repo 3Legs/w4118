@@ -151,8 +151,10 @@ static struct task_struct *pick_next_task_edf(struct rq *rq)
     struct edf_rq *edf_rq = &rq->edf;
     struct sched_edf_entity *se;
     
-    if (!edf_rq->nr_running)
+    if (!edf_rq->nr_running) {
+        printk(KERN_ALERT "Nothing left for EDF\n");
         return NULL;
+    }
 
     se = pick_next_entity_edf(edf_rq);
     if (se)
