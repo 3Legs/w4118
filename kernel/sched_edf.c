@@ -16,6 +16,20 @@ entity_key_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 }
 
 static void
+account_edf_entity_enqueue(struct edf_rq *edf_rq, struct sched_edf_entity *se)
+{
+    edf_rq->nr_running++;
+    se->on_rq = 1;
+}
+
+static void
+account_edf_entity_dequeue(struct edf_rq *edf_rq, struct sched_edf_entity *se)
+{
+    edf_rq->nr_running--;
+    se->on_rq = 0;
+}
+
+static void
 __enqueue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
     struct rb_node **link = &edf_rq->task_root.rb_node;
@@ -59,15 +73,17 @@ __dequeue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 static void
 enqueue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
-    __enqueue_entity_edf(edf_rq, se);
-    edf_rq->nr_running++;
+    account_edf_entity_enqueue(edf_rq, se);
+    if (se != edf_rq->curr)
+        __enqueue_entity_edf(edf_rq, se);
 }
 
 static void
 dequeue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
-    __dequeue_entity_edf(edf_rq, se);
-    edf_rq->nr_running--;
+    account_edf_entity_dequeue(edf_rq, se);
+    if (se != edf_rq->curr)
+        __dequeue_entity_edf(edf_rq, se);
 }
 
 static struct sched_edf_entity *__pick_next_entity_edf(struct edf_rq *edf_rq)
@@ -95,11 +111,13 @@ put_prev_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 static void 
 enqueue_task_edf(struct rq *rq, struct task_struct *p,int wakeup)
 {
-    struct edf_rq *edf_rq = &rq->edf;
+    struct edf_rq *edf_rq;
     struct sched_edf_entity *se = &p->edf_se;
     
-    if (se)
+    if (se && !se->on_rq) {
+        edf_rq = &rq->edf;
         enqueue_entity_edf(edf_rq, se);
+    }
 
     printk(KERN_ALERT "Enqueue PID: %d, TOTAL: %lu\n", edf_task_of(se)->pid, rq->edf.nr_running);
 }
