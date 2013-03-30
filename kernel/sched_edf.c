@@ -110,7 +110,7 @@ static struct sched_edf_entity *pick_next_entity_edf(struct edf_rq *edf_rq)
 static void 
 put_prev_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
-    /* edf_rq->curr = NULL; */
+    edf_rq->curr = NULL;
 }
 
 static void 
