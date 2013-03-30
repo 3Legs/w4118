@@ -5489,8 +5489,12 @@ int
 sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
 {
     if (p) {
-        p->sched_class = &edf_sched_class;
-        p->edf_se.netlock_timeout = deadline;
+        if (deadline){
+            p->sched_class = &edf_sched_class;
+            p->edf_se.netlock_timeout = deadline;
+        } else {
+            p->sched_class = &fair_sched_class;
+        }
         return 0;
     }
     
