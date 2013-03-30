@@ -5359,12 +5359,14 @@ recheck:
 	 * 1..MAX_USER_RT_PRIO-1, valid priority for SCHED_NORMAL,
 	 * SCHED_BATCH and SCHED_IDLE is 0.
 	 */
-	if (param->sched_priority < 0 ||
-	    (p->mm && param->sched_priority > MAX_USER_RT_PRIO-1) ||
-	    (!p->mm && param->sched_priority > MAX_RT_PRIO-1))
-		return -EINVAL;
-	if (rt_policy(policy) != (param->sched_priority != 0))
-		return -EINVAL;
+    if (!unlikely(policy == SCHED_EDF)) {
+        if (param->sched_priority < 0 ||
+            (p->mm && param->sched_priority > MAX_USER_RT_PRIO-1) ||
+            (!p->mm && param->sched_priority > MAX_RT_PRIO-1))
+            return -EINVAL;
+        if (rt_policy(policy) != (param->sched_priority != 0))
+            return -EINVAL;
+    }
 
 	/*
 	 * Allow unprivileged RT tasks to decrease priority:
