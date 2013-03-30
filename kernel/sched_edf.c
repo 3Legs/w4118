@@ -191,13 +191,14 @@ check_preempt_curr_edf(struct rq *rq, struct task_struct *p, int sync)
 
     if (curr->policy != SCHED_FIFO &&
         curr->policy != SCHED_RR &&
-        curr->policy != SCHED_EDF) {
+        curr->policy != SCHED_EDF &&
+        p->policy == SCHED_EDF) {
         printk(KERN_ALERT "RESCHED: Normal PID: %d, to EDF PID: %d\n", curr->pid, p->pid);
         resched_task(curr);
         return;
     }
     
-    if (curr->policy == SCHED_EDF) {
+    if (curr->policy == SCHED_EDF && p->policy == SCHED_EDF) {
         if (entity_key_edf(edf_rq, pse) < entity_key_edf(edf_rq, se)) {
             /* new task has a earlier deadline */
             printk(KERN_ALERT
