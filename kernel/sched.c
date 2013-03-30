@@ -4602,8 +4602,10 @@ pick_next_task(struct rq *rq, struct task_struct *prev)
 	class = sched_class_highest;
 	for ( ; ; ) {
 		p = class->pick_next_task(rq);
-		if (p)
+		if (p) {
+            printk(KERN_ALERT "ACTUAL PICK PID: %d\n", p->pid);
 			return p;
+        }
 		/*
 		 * Will never be NULL as the idle class always
 		 * returns a non-NULL p:
