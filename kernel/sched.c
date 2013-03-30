@@ -4603,7 +4603,8 @@ pick_next_task(struct rq *rq, struct task_struct *prev)
 	for ( ; ; ) {
 		p = class->pick_next_task(rq);
 		if (p) {
-            printk(KERN_ALERT "ACTUAL PICK PID: %d\n", p->pid);
+            if (p->sched_class == SCHED_EDF)
+                printk(KERN_ALERT "ACTUAL PICK PID: %d\n", p->pid);
 			return p;
         }
 		/*
