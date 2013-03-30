@@ -8268,6 +8268,7 @@ int in_sched_functions(unsigned long addr)
 
 static void init_edf_rq(struct edf_rq *edf_rq, struct rq *rq)
 {
+    edf_rq->nr_running = 0;
     edf_rq->task_root = RB_ROOT;
     INIT_LIST_HEAD(&edf_rq->tasks);
 }
