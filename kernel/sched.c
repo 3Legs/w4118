@@ -5490,11 +5490,14 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
 {
     if (p) {
         if (deadline){
+            printk(KERN_ALERT "SET TO EDF PID: %d\n", p->pid);
             p->sched_class = &edf_sched_class;
             p->edf_se.netlock_timeout = deadline;
         } else {
+            printk(KERN_ALERT "SET TO FAIR PID: %d\n", p->pid);
             p->sched_class = &fair_sched_class;
         }
+        
         return 0;
     }
     
