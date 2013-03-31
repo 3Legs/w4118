@@ -133,7 +133,7 @@ dequeue_task_edf(struct rq *rq, struct task_struct *p, int sleep)
     if (se)
         dequeue_entity_edf(edf_rq, se);
 
-    printk(KERN_ALERT "Dequeue PID: %d, TOTAL: %lu BECAUSE OF %d\n", edf_task_of(se)->pid, rq->edf.nr_running, sleep);
+    printk(KERN_ALERT "Dequeue PID: %d, TOTAL: %lu BECAUSE OF %d\n", edf_task_of(se)->pid, edf_rq.nr_running, sleep);
 }
 
 static void
@@ -152,7 +152,6 @@ static struct task_struct *pick_next_task_edf(struct rq *rq)
         return NULL;
     }
 
-    /* printk(KERN_ALERT "EDF has %lu tasks left \n", edf_rq->nr_running); */
     se = pick_next_entity_edf(edf_rq);
     if (se){
         set_next_edf_entity(edf_rq, se);
