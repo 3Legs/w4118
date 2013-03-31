@@ -220,6 +220,9 @@ check_preempt_curr_edf(struct rq *rq, struct task_struct *p, int sync)
 static void 
 set_curr_task_edf (struct rq *rq)
 {
+    struct sched_edf_entity *se = &rq->curr->edf_se;
+    if (se)
+        set_next_edf_entity(rq->edf, se);
 }
 
 static void
@@ -271,9 +274,9 @@ static const struct sched_class edf_sched_class = {
 #endif
 
 	.set_curr_task          = set_curr_task_edf,
-	.task_tick		= task_tick_edf,
-	.task_new		= task_new_edf,
+	/* .task_tick		= task_tick_edf, */
+	/* .task_new		= task_new_edf, */
 
-	.prio_changed		= prio_changed_edf,
+	/* .prio_changed		= prio_changed_edf, */
 	.switched_to		= switched_to_edf,
 };
