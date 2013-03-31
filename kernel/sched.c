@@ -5516,7 +5516,7 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
             printk(KERN_ALERT "3\n");
             p->sched_class->switched_to(rq, p, running);
             printk(KERN_ALERT "4\n");
-            __task_rq_unlock(rq)
+            __task_rq_unlock(rq);
             printk(KERN_ALERT "5\n");
             /* param = kmalloc(sizeof(struct sched_param),GFP_KERNEL); */
             /* param->sched_priority = p->prio; */
