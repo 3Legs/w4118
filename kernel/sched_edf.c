@@ -157,7 +157,8 @@ static struct task_struct *pick_next_task_edf(struct rq *rq)
     if (se){
         set_next_edf_entity(edf_rq, se);
         p = edf_task_of(se);
-        printk(KERN_ALERT "Pick PID: %d, TOTAL: %lu\n", p->pid, edf_rq->nr_running);
+        if (p)
+            printk(KERN_ALERT "Pick PID: %d, TOTAL: %lu\n", p->pid, edf_rq->nr_running);
         return p;
     }
     printk(KERN_ALERT "Nothing left in EDF rq\n");
@@ -259,7 +260,7 @@ static const struct sched_class edf_sched_class = {
 #endif
 
 	.set_curr_task          = set_curr_task_edf,
-	/* .task_tick		= task_tick_edf, */
+	.task_tick		= task_tick_edf,
 	/* .task_new		= task_new_edf, */
 
 	/* .prio_changed		= prio_changed_edf, */
