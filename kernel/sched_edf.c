@@ -159,7 +159,7 @@ static struct task_struct *pick_next_task_edf(struct rq *rq)
     printk(KERN_ALERT "EDF has %lu tasks left \n", edf_rq->nr_running);
     se = pick_next_entity_edf(edf_rq);
     if (se){
-        /* set_next_edf_entity(edf_rq, se); */
+        set_next_edf_entity(edf_rq, se);
     }
     else {
         printk(KERN_ALERT "Nothing left in EDF rq\n");
