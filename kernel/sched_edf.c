@@ -133,7 +133,7 @@ dequeue_task_edf(struct rq *rq, struct task_struct *p, int sleep)
     if (se)
         dequeue_entity_edf(edf_rq, se);
 
-    printk(KERN_ALERT "Dequeue PID: %d, TOTAL: %lu BECAUSE OF %d\n", edf_task_of(se)->pid, edf_rq.nr_running, sleep);
+    printk(KERN_ALERT "Dequeue PID: %d, TOTAL: %lu BECAUSE OF %d\n", edf_task_of(se)->pid, edf_rq->nr_running, sleep);
 }
 
 static void

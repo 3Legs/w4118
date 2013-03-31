@@ -1458,7 +1458,7 @@ static struct task_struct *pick_next_task_fair(struct rq *rq)
 	struct task_struct *p;
 	struct cfs_rq *cfs_rq = &rq->cfs;
 	struct sched_entity *se;
-
+    printk(KERN_ALERT "HERE\n");
 	if (unlikely(!cfs_rq->nr_running))
 		return NULL;
 
