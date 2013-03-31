@@ -1463,7 +1463,6 @@ static struct task_struct *pick_next_task_fair(struct rq *rq)
 		return NULL;
 
 	do {
-        printk(KERN_ALERT "HERE\n");
 		se = pick_next_entity(cfs_rq);
 		/*
 		 * If se was a buddy, clear it so that it will have to earn
