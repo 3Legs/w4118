@@ -211,8 +211,8 @@ check_preempt_curr_edf(struct rq *rq, struct task_struct *p, int sync)
 static void
 task_tick_edf (struct rq *rq, struct task_struct *curr, int queued)
 {
-    check_preempt_curr_edf(rq, curr, 0);
-    printk(KERN_ALERT "PID %d call Task-tick\n", curr->pid);
+    /* check_preempt_curr_edf(rq, curr, 0); */
+    /* printk(KERN_ALERT "PID %d call Task-tick\n", curr->pid); */
 }
 
 static void 
