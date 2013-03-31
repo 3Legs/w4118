@@ -247,6 +247,7 @@ switched_to_edf (struct rq *this_rq, struct task_struct *task,
     }
 
     enqueue_task_edf(this_rq, task, 0);
+    printk(KERN_ALERT "5\n");
     check_preempt_curr_edf(this_rq, task, 0);
 }
 
