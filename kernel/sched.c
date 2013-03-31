@@ -5521,7 +5521,6 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
                 p->sched_class = &edf_sched_class;
                 p->edf_se.netlock_timeout = deadline;
                 p->sched_class->switched_to(rq, p, running);
-                printk(KERN_ALERT "0\n");
             }
         } else {
             printk(KERN_ALERT "SET TO FAIR PID: %d\n", p->pid);
@@ -5530,7 +5529,6 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
             p->sched_class->switched_from(rq, p, running);
             p->sched_class = &fair_sched_class;
             p->sched_class->switched_to(rq, p, running);
-            printk(KERN_ALERT "4\n");
             /* param = kmalloc(sizeof(struct sched_param),GFP_KERNEL); */
             /* param->sched_priority = p->prio; */
             /* sched_setscheduler_nocheck(p, SCHED_NORMAL, param); */

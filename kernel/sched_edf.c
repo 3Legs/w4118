@@ -149,6 +149,7 @@ static struct task_struct *pick_next_task_edf(struct rq *rq)
     struct sched_edf_entity *se;
     
     if (!edf_rq || !edf_rq->nr_running) {
+        printk(KERN_ALERT "Nothing left in EDF rq\n");
         return NULL;
     }
 
@@ -160,7 +161,6 @@ static struct task_struct *pick_next_task_edf(struct rq *rq)
             printk(KERN_ALERT "Pick PID: %d, TOTAL: %lu\n", p->pid, edf_rq->nr_running);
         return p;
     }
-    printk(KERN_ALERT "Nothing left in EDF rq\n");
     return NULL;
 }
 
