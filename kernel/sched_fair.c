@@ -1345,7 +1345,13 @@ static unsigned long wakeup_gran(struct sched_entity *se)
 static int
 wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
 {
-	s64 gran, vdiff = curr->vruntime - se->vruntime;
+    s64 gran, vdiff;
+    if (curr && se) {
+        gran = diff = curr->vruntime - se->vruntime;
+    } else {
+        printk(KERN_ALERT "ERROR %d %d", (int)(curr==NULL), (int)(se==NULL));
+        return 0;
+    }
 
 	if (vdiff <= 0)
 		return -1;
@@ -1468,19 +1474,13 @@ static struct task_struct *pick_next_task_fair(struct rq *rq)
 		 * If se was a buddy, clear it so that it will have to earn
 		 * the favour again.
 		 */
-        printk(KERN_ALERT "6\n");
 		__clear_buddies(cfs_rq, se);
-        printk(KERN_ALERT "5\n");
 		set_next_entity(cfs_rq, se);
-        printk(KERN_ALERT "4\n");
 		cfs_rq = group_cfs_rq(se);
-        printk(KERN_ALERT "3\n");
 	} while (cfs_rq);
 
 	p = task_of(se);
-    printk(KERN_ALERT "1\n");
 	hrtick_start_fair(rq, p);
-    printk(KERN_ALERT "2\n");
 
 	return p;
 }
