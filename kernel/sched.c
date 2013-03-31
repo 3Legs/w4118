@@ -5501,7 +5501,7 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
                 rq = __task_rq_lock(p);
                 running = task_current(rq, p);
                 p->sched_class->switched_to(rq, p, running);
-                printk(KERN_ALERT "end\n")
+                printk(KERN_ALERT "end\n");
                 __task_rq_unlock(rq);
                 printk(KERN_ALERT "0\n");
             }
