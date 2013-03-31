@@ -208,11 +208,12 @@ check_preempt_curr_edf(struct rq *rq, struct task_struct *p, int sync)
     }
 }
 
-static void 
-task_tick_edf (struct rq *rq, struct task_struct *curr, int queued)
-{
-    printk(KERN_ALERT "PID %d call Task-tick\n", curr->pid);
-}
+/* static void  */
+/* task_tick_edf (struct rq *rq, struct task_struct *curr, int queued) */
+/* { */
+/*     printk(KERN_ALERT "PID %d call Task-tick\n", curr->pid); */
+/* } */
+
 static void 
 set_curr_task_edf (struct rq *rq)
 {
@@ -265,7 +266,7 @@ static const struct sched_class edf_sched_class = {
 #endif
 
 	.set_curr_task          = set_curr_task_edf,
-	.task_tick		= task_tick_edf,
+	/* .task_tick		= task_tick_edf, */
 	/* .task_new		= task_new_edf, */
 
 	/* .prio_changed		= prio_changed_edf, */

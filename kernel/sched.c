@@ -4482,7 +4482,8 @@ void scheduler_tick(void)
 	spin_lock(&rq->lock);
 	update_rq_clock(rq);
 	update_cpu_load(rq);
-	curr->sched_class->task_tick(rq, curr, 0);
+    if (likely(curr->sched_class->task_tick))
+        curr->sched_class->task_tick(rq, curr, 0);
 	spin_unlock(&rq->lock);
 
 #ifdef CONFIG_SMP
@@ -5501,6 +5502,14 @@ int sched_setscheduler_nocheck(struct task_struct *p, int policy,
 	return __sched_setscheduler(p, policy, param, false);
 }
 
+/*
+ * sched_setscheduler_edf - change the scheduler policy to SCHED_EDF
+ * and set it's timeout value to deadline from kernelspace.
+ *  @p: the task in question
+ *  @deadline: timeout value.
+ *             if deadline = 0, means set scheduler policy 
+ *             back to SCHED_NORMAL
+ */
 int
 sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
 {
@@ -5510,10 +5519,12 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
     if (p) {
         if (deadline){
             printk(KERN_ALERT "SET TO EDF PID: %d\n", p->pid);
+
             if (!edf_policy(p->policy)) {
                 rq = __task_rq_lock(p);
                 running = task_current(rq, p);
                 on_rq = p->se.on_rq;
+
                 if (on_rq)
                     deactivate_task(rq, p, 0);
                 if (running)
@@ -5553,9 +5564,7 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
 
             check_class_changed(rq, p, &edf_sched_class, oldprio, running);
             __task_rq_unlock(rq);
-            /* param = kmalloc(sizeof(struct sched_param),GFP_KERNEL); */
-            /* param->sched_priority = p->prio; */
-            /* sched_setscheduler_nocheck(p, SCHED_NORMAL, param); */
+
         }
         return 0;
     }
