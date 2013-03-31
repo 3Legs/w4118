@@ -5512,7 +5512,7 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
         if (deadline){
             printk(KERN_ALERT "SET TO EDF PID: %d\n", p->pid);
             if (!edf_policy(p->policy)) {
-                rq = task_rq(p);
+                rq = __task_rq_lock(p);
                 running = task_current(rq, p);
 
                 if (p->sched_class->switched_from)
@@ -5521,6 +5521,7 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
                 p->sched_class = &edf_sched_class;
                 p->edf_se.netlock_timeout = deadline;
                 p->sched_class->switched_to(rq, p, running);
+                __task_rq_unlock(rq);
             }
         } else {
             printk(KERN_ALERT "SET TO FAIR PID: %d\n", p->pid);
