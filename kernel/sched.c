@@ -5478,7 +5478,7 @@ recheck:
  * NOTE that the task may be already dead.
  */
 int sched_setscheduler(struct task_struct *p, int policy,
-n		       struct sched_param *param)
+		       struct sched_param *param)
 {
 	return __sched_setscheduler(p, policy, param, true);
 }
@@ -5504,7 +5504,7 @@ int sched_setscheduler_nocheck(struct task_struct *p, int policy,
 int
 sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
 {
-    int running;
+    int running, on_rq;
     struct rq *rq;
     struct sched_param *param;
 
