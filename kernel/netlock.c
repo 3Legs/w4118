@@ -65,7 +65,6 @@ SYSCALL_DEFINE2(net_lock, netlock_t, type, u_int16_t, timeout_val) {
 	if(type == NET_LOCK_USE) {
 		struct user *temp;
 		struct my_timer *timer_node;
-		//ret = sched_setscheduler_edf(current, deadline);
 		temp = kmalloc(sizeof(struct user), GFP_KERNEL);
 		if(!temp) {
 			printk(KERN_ALERT "Error in kmalloc!\n");
@@ -85,6 +84,7 @@ SYSCALL_DEFINE2(net_lock, netlock_t, type, u_int16_t, timeout_val) {
 			return -ENOMEM;
 		}
 		init_timer(timer_node->timer);
+		ret = sched_setscheduler_edf(current, timeout_val*HZ+jiffies);
 		timer_node->timer->expires = jiffies + timeout_val*HZ;
 		timer_node->timer->data = (unsigned long)(current->pid);
 		timer_node->timer->function = wake_net_sleeper;
@@ -137,7 +137,7 @@ SYSCALL_DEFINE0(net_unlock) {
 	list_for_each_entry_safe(cur, next, user_list, list) {
 		if(cur->pid == current->pid) {
 			up_read(&netlock);
-			//sched_setscheduler_edf(current, 0);
+			sched_setscheduler_edf(current, 0);
 			list_del(&(cur->list));
 			printk(KERN_ALERT "In list_for_each_entry_safe, deleting PID: %d!\n", cur->pid);
 			flag = 1;
