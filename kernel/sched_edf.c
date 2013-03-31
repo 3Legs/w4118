@@ -260,7 +260,7 @@ static const struct sched_class edf_sched_class = {
 #endif
 
 	.set_curr_task          = set_curr_task_edf,
-	.task_tick		= task_tick_edf,
+	/* .task_tick		= task_tick_edf, */
 	/* .task_new		= task_new_edf, */
 
 	/* .prio_changed		= prio_changed_edf, */
