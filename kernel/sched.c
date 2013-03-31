@@ -5510,7 +5510,7 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
     if (p) {
         if (deadline){
             printk(KERN_ALERT "SET TO EDF PID: %d\n", p->pid);
-            if (!edf_policy(p)) {
+            if (!edf_policy(p->policy)) {
                 rq = task_rq(p);
                 running = task_current(rq, p);
 

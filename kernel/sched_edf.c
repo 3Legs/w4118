@@ -217,15 +217,6 @@ set_curr_task_edf (struct rq *rq)
         set_next_edf_entity(&rq->edf, se);
 }
 
-static void
-task_tick_edf (struct rq *rq, struct task_struct *p, int queued)
-{
-}
-
-static void task_new_edf (struct rq *rq, struct task_struct *p)
-{
-}
-
 static void 
 switched_to_edf (struct rq *this_rq, struct task_struct *task,
                      int running)
