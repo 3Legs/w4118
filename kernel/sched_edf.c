@@ -222,7 +222,7 @@ set_curr_task_edf (struct rq *rq)
 {
     struct sched_edf_entity *se = &rq->curr->edf_se;
     if (se)
-        set_next_edf_entity(rq->edf, se);
+        set_next_edf_entity(&rq->edf, se);
 }
 
 static void
