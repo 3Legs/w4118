@@ -820,7 +820,7 @@ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se);
 static struct sched_entity *pick_next_entity(struct cfs_rq *cfs_rq)
 {
 	struct sched_entity *se = __pick_next_entity(cfs_rq);
-
+    printk(KERN_ALERT "HERE\n");
 	if (cfs_rq->next && wakeup_preempt_entity(cfs_rq->next, se) < 1)
 		return cfs_rq->next;
 
