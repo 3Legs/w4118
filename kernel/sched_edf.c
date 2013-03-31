@@ -235,7 +235,7 @@ switched_to_edf (struct rq *this_rq, struct task_struct *task,
 
 static void
 switched_from_edf (struct rq *rq, struct task_struct *p, int running) {
-    dequeue_task_edf(rq, p, 0);
+    /* dequeue_task_edf(rq, p, 0); */
     /* if (running) { */
     /*     resched_task(p); */
     /* } */

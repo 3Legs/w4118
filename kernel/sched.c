@@ -5504,9 +5504,8 @@ int sched_setscheduler_nocheck(struct task_struct *p, int policy,
 int
 sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
 {
-    int running, on_rq;
+    int running, on_rq, oldprio;
     struct rq *rq;
-    struct sched_param *param;
 
     if (p) {
         if (deadline){
@@ -5533,11 +5532,26 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
             }
         } else {
             printk(KERN_ALERT "SET TO FAIR PID: %d\n", p->pid);
+
+            oldprio = p->prio;
+
             rq = __task_rq_lock(p);
+            on_rq = p->edf_se.on_rq;
             running = task_current(rq, p);
-            p->sched_class->switched_from(rq, p, running);
+            
+            if (on_rq)
+                deactivate_task(rq, p , 0);
+            if (running)
+                p->sched_class->put_prev_task(rq, p);
+
             p->sched_class = &fair_sched_class;
-            p->sched_class->switched_to(rq, p, running);
+
+            if (running)
+                p->sched_class->set_curr_task(rq);
+            if (on_rq)
+                activate_task(rq, p, 0);
+
+            check_class_changed(rq, p, &edf_sched_class, oldprio, running);
             __task_rq_unlock(rq);
             /* param = kmalloc(sizeof(struct sched_param),GFP_KERNEL); */
             /* param->sched_priority = p->prio; */
