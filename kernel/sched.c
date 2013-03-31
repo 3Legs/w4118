@@ -4603,7 +4603,10 @@ pick_next_task(struct rq *rq, struct task_struct *prev)
 {
 	const struct sched_class *class;
 	struct task_struct *p;
-
+    
+    if (prev && task_has_edf_policy(prev)) {
+        printk(KERN_ALERT "Pick from PID: %d\n", prev->pid);
+    }
 	/*
 	 * Optimization: we know that if all tasks are in
 	 * the fair class we can call that function directly:
@@ -4618,8 +4621,6 @@ pick_next_task(struct rq *rq, struct task_struct *prev)
 	for ( ; ; ) {
 		p = class->pick_next_task(rq);
 		if (p) {
-            if (p->policy == SCHED_EDF)
-                printk(KERN_ALERT "ACTUAL PICK PID: %d\n", p->pid);
 			return p;
         }
 		/*

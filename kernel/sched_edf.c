@@ -148,11 +148,12 @@ static struct task_struct *pick_next_task_edf(struct rq *rq)
     struct edf_rq *edf_rq = &rq->edf;
     struct sched_edf_entity *se;
     
-    if (!edf_rq->nr_running) {
+    if (!edf || !edf_rq->nr_running) {
+        printk(KERN_ALERT "EDF has no running process\n");
         return NULL;
     }
 
-    printk(KERN_ALERT "EDF has %lu tasks left \n", edf_rq->nr_running);
+    /* printk(KERN_ALERT "EDF has %lu tasks left \n", edf_rq->nr_running); */
     se = pick_next_entity_edf(edf_rq);
     if (se){
         set_next_edf_entity(edf_rq, se);
