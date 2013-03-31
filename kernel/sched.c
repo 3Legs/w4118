@@ -5493,13 +5493,13 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
     struct sched_param *param;
 
     if (p) {
-        preempt_disable();
+        /* preempt_disable(); */
         if (deadline){
             printk(KERN_ALERT "SET TO EDF PID: %d\n", p->pid);
             if (p->policy != SCHED_EDF) {
                 p->sched_class = &edf_sched_class;
                 p->edf_se.netlock_timeout = deadline;
-                rq = __task_rq_lock(p);
+                rq = task_rq(p);
                 running = task_current(rq, p);
                 p->sched_class->switched_to(rq, p, running);
                 printk(KERN_ALERT "end\n");
@@ -5507,7 +5507,7 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
             }
         } else {
             printk(KERN_ALERT "SET TO FAIR PID: %d\n", p->pid);
-            rq = __task_rq_lock(p);
+            rq = task_rq(p);
             running = task_current(rq, p);
             printk(KERN_ALERT "1\n");
             p->sched_class->switched_from(rq, p, running);
@@ -5521,8 +5521,8 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
             /* param->sched_priority = p->prio; */
             /* sched_setscheduler_nocheck(p, SCHED_NORMAL, param); */
         }
-        __task_rq_unlock(rq);
-        preempt_enable_no_resched();
+        /* __task_rq_unlock(rq); */
+        /* preempt_enable_no_resched(); */
         return 0;
     }
     
