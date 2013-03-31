@@ -1,3 +1,5 @@
+#include "linux/random.h"
+
 #define for_each_sched_entity_edf(se) \
     for (; se; se = NULL)
 
@@ -147,11 +149,16 @@ static struct task_struct *pick_next_task_edf(struct rq *rq)
     struct task_struct *p;
     struct edf_rq *edf_rq = &rq->edf;
     struct sched_edf_entity *se;
-    
-    if (!edf_rq || !edf_rq->nr_running) {
+    unsigned int rand;
+
+    /* We set 20% probability to force EDF process yield next*/
+    get_random_bytes(&rand, sizeof(unsigned int));
+    rand = rand % 10;
+
+    if ((rand <= 2) || !edf_rq || !edf_rq->nr_running) {
         return NULL;
     }
-
+    
     se = pick_next_entity_edf(edf_rq);
     if (se){
         set_next_edf_entity(edf_rq, se);
@@ -211,8 +218,6 @@ check_preempt_curr_edf(struct rq *rq, struct task_struct *p, int sync)
 static void
 task_tick_edf (struct rq *rq, struct task_struct *curr, int queued)
 {
-    /* check_preempt_curr_edf(rq, curr, 0); */
-    /* printk(KERN_ALERT "PID %d call Task-tick\n", curr->pid); */
 }
 
 static void 
@@ -238,10 +243,6 @@ switched_to_edf (struct rq *this_rq, struct task_struct *task,
 
 static void
 switched_from_edf (struct rq *rq, struct task_struct *p, int running) {
-    /* dequeue_task_edf(rq, p, 0); */
-    /* if (running) { */
-    /*     resched_task(p); */
-    /* } */
 }
 
 static const struct sched_class edf_sched_class = {

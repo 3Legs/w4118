@@ -5515,61 +5515,64 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
 {
     int running, on_rq, oldprio;
     struct rq *rq;
+    
+    if (!p)
+        return -EINVAL;
 
-    if (p) {
-        if (deadline){
-            printk(KERN_ALERT "SET TO EDF PID: %d\n", p->pid);
-
-            if (!edf_policy(p->policy)) {
-                rq = __task_rq_lock(p);
-                running = task_current(rq, p);
-                on_rq = p->se.on_rq;
-
-                if (on_rq)
-                    deactivate_task(rq, p, 0);
-                if (running)
-                    p->sched_class->put_prev_task(rq, p);
-
-                p->sched_class = &edf_sched_class;
-                p->edf_se.netlock_timeout = deadline;
-                
-                if (running)
-                    p->sched_class->set_curr_task(rq);
-                if (on_rq)
-                    activate_task(rq, p, 0);
-
-                p->sched_class->switched_to(rq, p, running);
-                __task_rq_unlock(rq);
-            }
-        } else {
-            printk(KERN_ALERT "SET TO FAIR PID: %d\n", p->pid);
-
-            oldprio = p->prio;
-
+    if (deadline){
+        printk(KERN_ALERT "SET TO EDF PID: %d\n", p->pid);
+        if (!task_has_edf_policy(p)) {
             rq = __task_rq_lock(p);
-            on_rq = p->edf_se.on_rq;
             running = task_current(rq, p);
-            
+            on_rq = p->se.on_rq;
+
             if (on_rq)
-                deactivate_task(rq, p , 0);
+                deactivate_task(rq, p, 0);
             if (running)
                 p->sched_class->put_prev_task(rq, p);
 
-            p->sched_class = &fair_sched_class;
-
+            p->sched_class = &edf_sched_class;
+            p->edf_se.netlock_timeout = deadline;
+                
+            /* now we need to set p to the right CPU */
+#ifdef CONFIG_SMP
+            
+#endif
             if (running)
                 p->sched_class->set_curr_task(rq);
             if (on_rq)
                 activate_task(rq, p, 0);
 
-            check_class_changed(rq, p, &edf_sched_class, oldprio, running);
+            p->sched_class->switched_to(rq, p, running);
             __task_rq_unlock(rq);
-
         }
-        return 0;
+    } else {
+        printk(KERN_ALERT "SET TO FAIR PID: %d\n", p->pid);
+
+        oldprio = p->prio;
+
+        rq = __task_rq_lock(p);
+        on_rq = p->edf_se.on_rq;
+        running = task_current(rq, p);
+            
+        if (on_rq)
+            deactivate_task(rq, p , 0);
+        if (running)
+            p->sched_class->put_prev_task(rq, p);
+
+        p->sched_class = &fair_sched_class;
+
+        if (running)
+            p->sched_class->set_curr_task(rq);
+        if (on_rq)
+            activate_task(rq, p, 0);
+
+        check_class_changed(rq, p, &edf_sched_class, oldprio, running);
+        __task_rq_unlock(rq);
+
     }
     
-    return -EINVAL;
+    return 0;
 }
 
 static int
