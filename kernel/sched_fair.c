@@ -1347,7 +1347,7 @@ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
 {
     s64 gran, vdiff;
     if (curr && se) {
-        gran = diff = curr->vruntime - se->vruntime;
+        gran = vdiff = curr->vruntime - se->vruntime;
     } else {
         printk(KERN_ALERT "ERROR %d %d", (int)(curr==NULL), (int)(se==NULL));
         return 0;
