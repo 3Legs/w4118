@@ -75,6 +75,7 @@ enqueue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
 
     if (se != edf_rq->curr) {
+        printk(KERN_ALERT "6\n");
         __enqueue_entity_edf(edf_rq, se);
     }
     account_edf_entity_enqueue(edf_rq, se);
@@ -121,7 +122,6 @@ enqueue_task_edf(struct rq *rq, struct task_struct *p,int wakeup)
     struct sched_edf_entity *se = &p->edf_se;
     
     if (se && !se->on_rq) {
-        printk(KERN_ALERT "6\n");
         edf_rq = &rq->edf;
         enqueue_entity_edf(edf_rq, se);
     }
