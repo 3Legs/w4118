@@ -5478,7 +5478,7 @@ recheck:
  * NOTE that the task may be already dead.
  */
 int sched_setscheduler(struct task_struct *p, int policy,
-		       struct sched_param *param)
+n		       struct sched_param *param)
 {
 	return __sched_setscheduler(p, policy, param, true);
 }
@@ -5514,12 +5514,20 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
             if (!edf_policy(p->policy)) {
                 rq = __task_rq_lock(p);
                 running = task_current(rq, p);
-
-                if (p->sched_class->switched_from)
-                    p->sched_class->switched_from(rq, p, running);
+                on_rq = p->se.on_rq;
+                if (on_rq)
+                    deactivate_task(rq, p, 0);
+                if (running)
+                    p->sched_class->put_prev_task(rq, p);
 
                 p->sched_class = &edf_sched_class;
                 p->edf_se.netlock_timeout = deadline;
+                
+                if (running)
+                    p->sched_class->set_curr_task(rq);
+                if (on_rq)
+                    activate_task(rq, p, 0);
+
                 p->sched_class->switched_to(rq, p, running);
                 __task_rq_unlock(rq);
             }
