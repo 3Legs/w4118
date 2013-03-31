@@ -5493,6 +5493,7 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
     struct sched_param *param;
 
     if (p) {
+        preempt_disable();
         if (deadline){
             printk(KERN_ALERT "SET TO EDF PID: %d\n", p->pid);
             if (p->policy != SCHED_EDF) {
@@ -5521,6 +5522,7 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
             /* sched_setscheduler_nocheck(p, SCHED_NORMAL, param); */
         }
         __task_rq_unlock(rq);
+        preempt_enable_no_resched();
         return 0;
     }
     
