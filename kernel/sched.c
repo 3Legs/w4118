@@ -5505,15 +5505,16 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
             }
         } else {
             printk(KERN_ALERT "SET TO FAIR PID: %d\n", p->pid);
-            /* p->sched_class = &fair_sched_class; */
+            p->sched_class = &fair_sched_class;
             /* resched_task(pn); */
-            /* rq = __task_rq_lock(p); */
-            /* running = task_current(rq, p); */
+            rq = __task_rq_lock(p);
+            running = task_current(rq, p);
             /* check_class_changed(rq, p, &edf_sched_class, 0, running); */
-            /* __task_rq_unlock(rq); */
-            param = kmalloc(sizeof(struct sched_param),GFP_KERNEL);
-            param->sched_priority = p->prio;
-            sched_setscheduler_nocheck(p, SCHED_NORMAL, param);
+            p->sched_class->switched_to(rq, p, running);
+            __task_rq_unlock(rq);
+            /* param = kmalloc(sizeof(struct sched_param),GFP_KERNEL); */
+            /* param->sched_priority = p->prio; */
+            /* sched_setscheduler_nocheck(p, SCHED_NORMAL, param); */
         }
         
         return 0;

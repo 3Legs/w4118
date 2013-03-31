@@ -241,6 +241,7 @@ switched_to_edf (struct rq *this_rq, struct task_struct *task,
     printk(KERN_ALERT "PID: %d switch to EDF", task->pid);
     if (running) {
         printk(KERN_ALERT " and it's running\n");
+        resched_task(task);
     } else {
         printk(KERN_ALERT " and it's not running\n");
     }
