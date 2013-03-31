@@ -148,7 +148,7 @@ static struct task_struct *pick_next_task_edf(struct rq *rq)
     struct edf_rq *edf_rq = &rq->edf;
     struct sched_edf_entity *se;
     
-    if (!edf || !edf_rq->nr_running) {
+    if (!edf_rq || !edf_rq->nr_running) {
         printk(KERN_ALERT "EDF has no running process\n");
         return NULL;
     }
