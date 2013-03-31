@@ -5506,6 +5506,7 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
         } else {
             printk(KERN_ALERT "SET TO FAIR PID: %d\n", p->pid);
             p->sched_class = &fair_sched_class;
+            resched_task(p);
             /* rq = __task_rq_lock(p); */
             /* running = task_current(rq, p); */
             /* check_class_changed(rq, p, &edf_sched_class, 0, running); */
