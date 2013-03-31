@@ -121,6 +121,7 @@ enqueue_task_edf(struct rq *rq, struct task_struct *p,int wakeup)
     struct sched_edf_entity *se = &p->edf_se;
     
     if (se && !se->on_rq) {
+        printk(KERN_ALERT "6\n");
         edf_rq = &rq->edf;
         enqueue_entity_edf(edf_rq, se);
     }
@@ -246,7 +247,7 @@ switched_to_edf (struct rq *this_rq, struct task_struct *task,
         printk(KERN_ALERT " and it's not running\n");
     }
 
-    enqueue_task_edf(this_rq, task, 0);
+    enqueue_task_edf(this_rq, task, running);
     printk(KERN_ALERT "5\n");
     check_preempt_curr_edf(this_rq, task, 0);
 }
