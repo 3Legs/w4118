@@ -250,10 +250,12 @@ switched_to_edf (struct rq *this_rq, struct task_struct *task,
     check_preempt_curr_edf(this_rq, task, 0);
 }
 
-static void 
-prio_changed_edf (struct rq *this_rq, struct task_struct *task,
-                      int oldprio, int running)
-{
+static void
+switched_from_edf (struct rq *rq, struct task_struct *p, int running) {
+    dequeue_task_edf(rq, p, 0);
+    if (running) {
+        resched_task(p);
+    }
 }
 
 static const struct sched_class edf_sched_class = {
@@ -280,4 +282,5 @@ static const struct sched_class edf_sched_class = {
 
 	/* .prio_changed		= prio_changed_edf, */
 	.switched_to		= switched_to_edf,
+    .switched_from      = switched_from_edf,
 };
