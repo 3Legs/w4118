@@ -85,7 +85,7 @@ SYSCALL_DEFINE2(net_lock, netlock_t, type, u_int16_t, timeout_val) {
 			return -ENOMEM;
 		}
 		init_timer(timer_node->timer);
-		timer_node->timer->expires = jiffies+timeout_val*HZ;
+		timer_node->timer->expires = jiffies + timeout_val*HZ;
 		timer_node->timer->data = (unsigned long)(current->pid);
 		timer_node->timer->function = wake_net_sleeper;
 		add_timer(timer_node->timer);
@@ -149,7 +149,7 @@ label0:
 	spin_unlock(&user_pids_lock);
 
 	if(!flag) {
-		printk(KERN_ALERT "Error in net_unlock, PID: %d\n", current->pid);
+		printk(KERN_ALERT "Unknown process %d tried to call net_unlock, abort!\n", current->pid);
 		goto err;
 	}
 	else {
@@ -169,6 +169,12 @@ err:
 SYSCALL_DEFINE0(net_lock_wait_timeout) {
 	struct my_timer *cur;
 	struct my_timer *next;
+	int ret = 0;
+	if(atomic_read(&radio_controller) != current->pid) {
+		printk(KERN_ALERT "The PID of the radio controller is %d, the current pid %d is not allowed to call net_lock_wait_timeout!\n", atomic_read(&radio_controller), current->pid);
+		ret = -EPERM;
+		goto err;
+	}
 	atomic_set(&first_timeout, 1);
 	wait_event(first, atomic_read(&first_timeout) == 0);
 
@@ -178,5 +184,8 @@ SYSCALL_DEFINE0(net_lock_wait_timeout) {
 			list_del(&(cur->list));
 		}
 	}
+suc:
 	return 0;
+err:
+	return ret;
 }
