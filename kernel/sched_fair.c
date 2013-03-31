@@ -820,7 +820,7 @@ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se);
 static struct sched_entity *pick_next_entity(struct cfs_rq *cfs_rq)
 {
 	struct sched_entity *se = __pick_next_entity(cfs_rq);
-    printk(KERN_ALERT "HERE\n");
+
 	if (cfs_rq->next && wakeup_preempt_entity(cfs_rq->next, se) < 1)
 		return cfs_rq->next;
 
@@ -1468,13 +1468,19 @@ static struct task_struct *pick_next_task_fair(struct rq *rq)
 		 * If se was a buddy, clear it so that it will have to earn
 		 * the favour again.
 		 */
+        printk(KERN_ALERT "6\n");
 		__clear_buddies(cfs_rq, se);
+        printk(KERN_ALERT "5\n");
 		set_next_entity(cfs_rq, se);
+        printk(KERN_ALERT "4\n");
 		cfs_rq = group_cfs_rq(se);
+        printk(KERN_ALERT "3\n");
 	} while (cfs_rq);
 
 	p = task_of(se);
+    printk(KERN_ALERT "1\n");
 	hrtick_start_fair(rq, p);
+    printk(KERN_ALERT "2\n");
 
 	return p;
 }
