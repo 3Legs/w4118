@@ -160,6 +160,19 @@ static inline int task_has_rt_policy(struct task_struct *p)
 	return rt_policy(p->policy);
 }
 
+static inline int edf_policy(int policy)
+{
+    if (unlikely(policy == SCHED_EDF))
+        return 1;
+    return 0;
+}
+
+static inline int task_has_edf_policy(struct task_struct *p)
+{
+    return edf_policy(p->policy);
+}
+
+
 /*
  * This is the priority-queue data structure of the RT scheduling class:
  */
@@ -398,6 +411,7 @@ static inline struct task_group *task_group(struct task_struct *p)
 }
 
 #endif	/* CONFIG_GROUP_SCHED */
+
 /* EDF-related fields in a runqueue */
 struct edf_rq {
 	unsigned long nr_running;
@@ -1845,6 +1859,7 @@ static inline void check_class_changed(struct rq *rq, struct task_struct *p,
 #ifdef CONFIG_SMP
 
 /* Used instead of source_load when we know the type == 0 */
+
 static unsigned long weighted_cpuload(const int cpu)
 {
 	return cpu_rq(cpu)->load.weight;
@@ -5493,35 +5508,32 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
     struct sched_param *param;
 
     if (p) {
-        /* preempt_disable(); */
         if (deadline){
             printk(KERN_ALERT "SET TO EDF PID: %d\n", p->pid);
-            if (p->policy != SCHED_EDF) {
-                p->sched_class = &edf_sched_class;
-                p->edf_se.netlock_timeout = deadline;
+            if (!edf_policy(p)) {
                 rq = task_rq(p);
                 running = task_current(rq, p);
+
+                if (p->sched_class->switched_from)
+                    p->sched_class->switched_from(rq, p, running);
+
+                p->sched_class = &edf_sched_class;
+                p->edf_se.netlock_timeout = deadline;
                 p->sched_class->switched_to(rq, p, running);
-                printk(KERN_ALERT "end\n");
                 printk(KERN_ALERT "0\n");
             }
         } else {
             printk(KERN_ALERT "SET TO FAIR PID: %d\n", p->pid);
-            rq = task_rq(p);
-            running = task_current(rq, p);
-            printk(KERN_ALERT "1\n");
-            p->sched_class->switched_from(rq, p, running);
-            printk(KERN_ALERT "2\n");
-            p->sched_class = &fair_sched_class;
-            printk(KERN_ALERT "3\n");
-            p->sched_class->switched_to(rq, p, running);
+            /* rq = task_rq(p); */
+            /* running = task_current(rq, p); */
+            /* p->sched_class->switched_from(rq, p, running); */
+            /* p->sched_class = &fair_sched_class; */
+            /* p->sched_class->switched_to(rq, p, running); */
             printk(KERN_ALERT "4\n");
-            /* param = kmalloc(sizeof(struct sched_param),GFP_KERNEL); */
-            /* param->sched_priority = p->prio; */
-            /* sched_setscheduler_nocheck(p, SCHED_NORMAL, param); */
+            param = kmalloc(sizeof(struct sched_param),GFP_KERNEL);
+            param->sched_priority = p->prio;
+            sched_setscheduler_nocheck(p, SCHED_NORMAL, param);
         }
-        /* __task_rq_unlock(rq); */
-        /* preempt_enable_no_resched(); */
         return 0;
     }
     

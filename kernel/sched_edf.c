@@ -74,19 +74,14 @@ static void
 enqueue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
 
-    if (se != edf_rq->curr) {
-        printk(KERN_ALERT "6\n");
-        __enqueue_entity_edf(edf_rq, se);
-    }
+    __enqueue_entity_edf(edf_rq, se);
     account_edf_entity_enqueue(edf_rq, se);
 }
 
 static void
 dequeue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
-    if (se != edf_rq->curr) {
-        __dequeue_entity_edf(edf_rq, se);
-    }
+    __dequeue_entity_edf(edf_rq, se);
     account_edf_entity_dequeue(edf_rq, se);
 }
 
@@ -161,28 +156,24 @@ static struct task_struct *pick_next_task_edf(struct rq *rq)
     se = pick_next_entity_edf(edf_rq);
     if (se){
         set_next_edf_entity(edf_rq, se);
+        p = edf_task_of(se);
+        printk(KERN_ALERT "Pick PID: %d, TOTAL: %lu\n", p->pid, edf_rq->nr_running);
+        return p;
     }
-    else {
-        printk(KERN_ALERT "Nothing left in EDF rq\n");
-        return NULL;
-    }
-
-    p = edf_task_of(se);
-
-    printk(KERN_ALERT "Pick PID: %d, TOTAL: %lu\n", p->pid, edf_rq->nr_running);
-    return p;
+    printk(KERN_ALERT "Nothing left in EDF rq\n");
+    return NULL;
 }
 
 static void put_prev_task_edf(struct rq *rq, struct task_struct *prev)
 {
     /* nothing to be account for a EDF scheduling */
-    struct sched_edf_entity *se = &prev->edf_se;
-    struct edf_rq *edf_rq;
+    /* struct sched_edf_entity *se = &prev->edf_se; */
+    /* struct edf_rq *edf_rq; */
     
-    if (se) {
-        edf_rq = &rq->edf;
-        put_prev_entity_edf(edf_rq, se);
-    }
+    /* if (se) { */
+    /*     edf_rq = &rq->edf; */
+    /*     put_prev_entity_edf(edf_rq, se); */
+    /* } */
 
     printk(KERN_ALERT "Put PID: %d\n", prev->pid);
 }
@@ -240,24 +231,22 @@ switched_to_edf (struct rq *this_rq, struct task_struct *task,
                      int running)
 {
     printk(KERN_ALERT "PID: %d switch to EDF", task->pid);
+    enqueue_task_edf(this_rq, task, running);
     if (running) {
         printk(KERN_ALERT " and it's running\n");
         resched_task(task);
     } else {
-        printk(KERN_ALERT " and it's not running\n");
+        check_preempt_curr_edf(this_rq, task, 0);
     }
 
-    enqueue_task_edf(this_rq, task, running);
-    printk(KERN_ALERT "5\n");
-    check_preempt_curr_edf(this_rq, task, 0);
 }
 
 static void
 switched_from_edf (struct rq *rq, struct task_struct *p, int running) {
     dequeue_task_edf(rq, p, 0);
-    if (running) {
-        resched_task(p);
-    }
+    /* if (running) { */
+    /*     resched_task(p); */
+    /* } */
 }
 
 static const struct sched_class edf_sched_class = {
