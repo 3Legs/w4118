@@ -4605,9 +4605,6 @@ pick_next_task(struct rq *rq, struct task_struct *prev)
 	const struct sched_class *class;
 	struct task_struct *p;
     
-    if (prev && task_has_edf_policy(prev)) {
-        printk(KERN_ALERT "Pick from PID: %d\n", prev->pid);
-    }
 	/*
 	 * Optimization: we know that if all tasks are in
 	 * the fair class we can call that function directly:
@@ -5525,7 +5522,7 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
         return -EINVAL;
 
     if (deadline){
-        printk(KERN_ALERT "SET TO EDF PID: %d\n", p->pid);
+        printk(KERN_ALERT "Current process %d is set to EDF policy.\n", p->pid);
         if (!task_has_edf_policy(p)) {
             rq = __task_rq_lock(p);
             running = task_current(rq, p);
@@ -5552,7 +5549,6 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
             	min = new;
             	rq = rq_dest;
             }
-            printk(KERN_ALERT "CHECKED ONE MORE CPU.\n");
             double_rq_unlock(rq_src,rq_dest);
         }
 
@@ -5567,7 +5563,7 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
             __task_rq_unlock(rq);
         }
     } else {
-        printk(KERN_ALERT "SET TO FAIR PID: %d\n", p->pid);
+        printk(KERN_ALERT "Current process %d is set to normal policy.\n", p->pid);
 
         oldprio = p->prio;
 
