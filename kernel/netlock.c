@@ -46,7 +46,7 @@ struct my_timer {
 atomic_t first_timeout = ATOMIC_INIT(0);
 /*
 The PID of the radio controller. It is initialized to 0, the first sleeper who
-calls net_lock is recognized as the legal radio controller. Other processes 
+calls net_lock is recognized as the legal radio controller. Other processes
 afterwards are considered illegal radio controller.
 */
 atomic_t radio_controller = ATOMIC_INIT(0);
@@ -185,7 +185,7 @@ SYSCALL_DEFINE0(net_unlock) {
 
 	spin_lock(&user_pids_lock);
 
-	/* 
+	/*
 	Search through the list, if there is a PID in the list that
 	has the same PID as the current PID. Then the PID is a user.
 	*/
@@ -232,7 +232,7 @@ SYSCALL_DEFINE0(net_lock_wait_timeout) {
 	}
 	/* Only one radio controller is permited */
 	if (atomic_read(&radio_controller) != current->pid) {
-		printk(KERN_ALERT "The PID of the radio controller is %d, the current 
+		printk(KERN_ALERT "The PID of the radio controller is %d, the current
 			pid %d is not allowed to call net_lock_wait_timeout!\n", atomic_read(&radio_controller), current->pid);
 		ret = -EPERM;
 		goto err;
@@ -245,7 +245,7 @@ SYSCALL_DEFINE0(net_lock_wait_timeout) {
 	list_for_each_entry_safe(cur, next, my_timer_head, list) {
 		/* Delete all remaining timers when the first timer times out */
 		del_timer_sync(cur->timer);
-		if (cur->pid!=0) {
+		if (cur->pid != 0) {
 			list_del(&(cur->list));
 		}
 	}
