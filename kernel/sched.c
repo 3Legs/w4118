@@ -5521,7 +5521,7 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
     if (!p)
         return -EINVAL;
 
-    if (deadline){
+    if (deadline) {
         printk(KERN_ALERT "Current process %d is set to EDF policy.\n", p->pid);
         if (!task_has_edf_policy(p)) {
             rq = __task_rq_lock(p);
@@ -5535,24 +5535,20 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
 
             p->sched_class = &edf_sched_class;
             p->edf_se.netlock_timeout = deadline;
-                
             /* now we need to set p to the right CPU */
 #ifdef CONFIG_SMP
-        
-        min = cpu_rq(get_cpu())->edf.nr_running;
-        rq_src = cpu_rq(get_cpu());
-        for_each_online_cpu(i) {
-            rq_dest = cpu_rq(i);
-            double_rq_lock(rq_src,rq_dest);
-            new = cpu_rq(i)->edf.nr_running;
-            if (new < min) {
-            	min = new;
-            	rq = rq_dest;
-            }
-            double_rq_unlock(rq_src,rq_dest);
-        }
-
-        
+		        min = cpu_rq(get_cpu())->edf.nr_running;
+		        rq_src = cpu_rq(get_cpu());
+		        for_each_online_cpu(i) {
+		            rq_dest = cpu_rq(i);
+		            double_rq_lock(rq_src,rq_dest);
+		            new = cpu_rq(i)->edf.nr_running;
+		            if (new < min) {
+		            	min = new;
+		            	rq = rq_dest;
+		            }
+		            double_rq_unlock(rq_src,rq_dest);
+		        }
 #endif
             if (running)
                 p->sched_class->set_curr_task(rq);
@@ -5570,7 +5566,6 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
         rq = __task_rq_lock(p);
         on_rq = p->edf_se.on_rq;
         running = task_current(rq, p);
-            
         if (on_rq)
             deactivate_task(rq, p , 0);
         if (running)
@@ -5582,12 +5577,9 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
             p->sched_class->set_curr_task(rq);
         if (on_rq)
             activate_task(rq, p, 0);
-
         check_class_changed(rq, p, &edf_sched_class, oldprio, running);
         __task_rq_unlock(rq);
-
     }
-    
     return 0;
 }
 

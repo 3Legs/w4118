@@ -11,7 +11,7 @@ edf_task_of(struct sched_edf_entity *se)
     return container_of(se, struct task_struct, edf_se);
 }
 
-static inline unsigned long 
+static inline unsigned long
 entity_key_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
     return se->netlock_timeout;
@@ -43,7 +43,6 @@ __enqueue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
     while (*link) {
         parent = *link;
         entry = rb_entry(parent, struct sched_edf_entity, run_node);
-        
         if (key < entity_key_edf(edf_rq, entry)) {
             link = &parent->rb_left;
         } else {
@@ -75,7 +74,6 @@ __dequeue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 static void
 enqueue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 {
-
     __enqueue_entity_edf(edf_rq, se);
     account_edf_entity_enqueue(edf_rq, se);
 }
@@ -90,8 +88,8 @@ dequeue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 static struct sched_edf_entity *__pick_next_entity_edf(struct edf_rq *edf_rq)
 {
     struct rb_node *left = edf_rq->rb_leftmost;
-    
-    if(!left)
+
+    if (!left)
         return NULL;
 
     return rb_entry(left, struct sched_edf_entity, run_node);
@@ -103,12 +101,12 @@ static struct sched_edf_entity *pick_next_entity_edf(struct edf_rq *edf_rq)
     return se;
 }
 
-static void 
+static void
 enqueue_task_edf(struct rq *rq, struct task_struct *p,int wakeup)
 {
     struct edf_rq *edf_rq;
     struct sched_edf_entity *se = &p->edf_se;
-    
+
     if (se && !se->on_rq) {
         edf_rq = &rq->edf;
         enqueue_entity_edf(edf_rq, se);
@@ -117,7 +115,7 @@ enqueue_task_edf(struct rq *rq, struct task_struct *p,int wakeup)
     printk(KERN_ALERT "New EDF process %d enqueued, total number is %lu\n", edf_task_of(se)->pid, rq->edf.nr_running);
 }
 
-static void 
+static void
 dequeue_task_edf(struct rq *rq, struct task_struct *p, int sleep)
 {
     struct edf_rq *edf_rq = &rq->edf;
@@ -149,9 +147,9 @@ static struct task_struct *pick_next_task_edf(struct rq *rq)
     if ((rand <= 2) || !edf_rq || !edf_rq->nr_running) {
         return NULL;
     }
-    
+
     se = pick_next_entity_edf(edf_rq);
-    if (se){
+    if (se) {
         set_next_edf_entity(edf_rq, se);
         p = edf_task_of(se);
         if (p)
@@ -166,7 +164,7 @@ static void put_prev_task_edf(struct rq *rq, struct task_struct *prev)
     printk(KERN_ALERT "EDF task %d is put\n", prev->pid);
 }
 
-static void 
+static void
 check_preempt_curr_edf(struct rq *rq, struct task_struct *p, int sync)
 {
     struct task_struct *curr = rq->curr;
@@ -184,7 +182,7 @@ check_preempt_curr_edf(struct rq *rq, struct task_struct *p, int sync)
         resched_task(curr);
         return;
     }
-    
+
     if (curr->policy == SCHED_EDF && p->policy == SCHED_EDF) {
         if (entity_key_edf(edf_rq, pse) < entity_key_edf(edf_rq, se)) {
             /* new task has a earlier deadline */
@@ -199,7 +197,7 @@ task_tick_edf (struct rq *rq, struct task_struct *curr, int queued)
 
 }
 
-static void 
+static void
 set_curr_task_edf (struct rq *rq)
 {
     struct sched_edf_entity *se = &rq->curr->edf_se;
@@ -207,7 +205,7 @@ set_curr_task_edf (struct rq *rq)
         set_next_edf_entity(&rq->edf, se);
 }
 
-static void 
+static void
 switched_to_edf (struct rq *this_rq, struct task_struct *task,
                      int running)
 {
@@ -221,6 +219,7 @@ switched_to_edf (struct rq *this_rq, struct task_struct *task,
 
 static void
 switched_from_edf (struct rq *rq, struct task_struct *p, int running) {
+
 }
 
 static const struct sched_class edf_sched_class = {
@@ -234,7 +233,7 @@ static const struct sched_class edf_sched_class = {
     .pick_next_task = pick_next_task_edf,
     .put_prev_task = put_prev_task_edf,
 
-#ifdef COMFIG_SMP    
+#ifdef COMFIG_SMP
     .select_task_rq = select_task_rq_edf,
 
     .load_balance   = load_balance_edf,

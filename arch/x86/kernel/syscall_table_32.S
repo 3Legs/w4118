@@ -337,4 +337,3 @@ ENTRY(sys_call_table)
 	.long sys_net_unlock
 	.long sys_net_lock_wait_timeout 		/* 335 */
 	/* hw3 */
-	
