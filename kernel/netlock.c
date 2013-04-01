@@ -232,8 +232,9 @@ SYSCALL_DEFINE0(net_lock_wait_timeout) {
 	}
 	/* Only one radio controller is permited */
 	if (atomic_read(&radio_controller) != current->pid) {
-		printk(KERN_ALERT "The PID of the radio controller is %d, the current
-			pid %d is not allowed to call net_lock_wait_timeout!\n", atomic_read(&radio_controller), current->pid);
+		printk(KERN_ALERT "The PID of the radio controller is %d, the current	\
+			pid %d is not allowed to call net_lock_wait_timeout!\n", 
+			atomic_read(&radio_controller), current->pid);
 		ret = -EPERM;
 		goto err;
 	}
