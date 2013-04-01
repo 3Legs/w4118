@@ -5515,7 +5515,12 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
 {
     int running, on_rq, oldprio;
     struct rq *rq;
-    
+#ifdef CONFIG_SMP
+    int i;
+    unsigned long min;
+    unsigned long new;
+    struct rq *rq_src, *rq_dest;
+#endif
     if (!p)
         return -EINVAL;
 
@@ -5536,7 +5541,22 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
                 
             /* now we need to set p to the right CPU */
 #ifdef CONFIG_SMP
-            
+        
+        min = cpu_rq(get_cpu())->edf.nr_running;
+        rq_src = cpu_rq(get_cpu());
+        for_each_online_cpu(i) {
+            rq_dest = cpu_rq(i);
+            double_rq_lock(rq_src,rq_dest);
+            new = cpu_rq(i)->edf.nr_running;
+            if (new < min) {
+            	min = new;
+            	rq = rq_dest;
+            }
+            printk(KERN_ALERT "CHECKED ONE MORE CPU.\n");
+            double_rq_unlock(rq_src,rq_dest);
+        }
+
+        
 #endif
             if (running)
                 p->sched_class->set_curr_task(rq);
