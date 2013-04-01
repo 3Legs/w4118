@@ -67,7 +67,6 @@ __dequeue_entity_edf(struct edf_rq *edf_rq, struct sched_edf_entity *se)
 		next_node = rb_next(&se->run_node);
 		edf_rq->rb_leftmost = next_node;
 	}
-	
 	rb_erase(&se->run_node, &edf_rq->task_root);
 }
 
@@ -102,7 +101,7 @@ static struct sched_edf_entity *pick_next_entity_edf(struct edf_rq *edf_rq)
 }
 
 static void
-enqueue_task_edf(struct rq *rq, struct task_struct *p,int wakeup)
+enqueue_task_edf(struct rq *rq, struct task_struct *p, int wakeup)
 {
 	struct edf_rq *edf_rq;
 	struct sched_edf_entity *se = &p->edf_se;

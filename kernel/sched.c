@@ -5503,7 +5503,7 @@ int sched_setscheduler_nocheck(struct task_struct *p, int policy,
  * and set it's timeout value to deadline from kernelspace.
  *  @p: the task in question
  *  @deadline: timeout value.
- *if deadline = 0, means set scheduler policy 
+ *if deadline = 0, means set scheduler policy
  *back to SCHED_NORMAL
  */
 int
@@ -5540,13 +5540,13 @@ sched_setscheduler_edf(struct task_struct *p, unsigned long deadline)
 						rq_src = cpu_rq(get_cpu());
 						for_each_online_cpu(i) {
 								rq_dest = cpu_rq(i);
-								double_rq_lock(rq_src,rq_dest);
+								double_rq_lock(rq_src, rq_dest);
 								new = cpu_rq(i)->edf.nr_running;
 								if (new < min) {
 									min = new;
 									rq = rq_dest;
 								}
-								double_rq_unlock(rq_src,rq_dest);
+								double_rq_unlock(rq_src, rq_dest);
 						}
 #endif
 						if (running)
