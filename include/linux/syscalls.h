@@ -692,6 +692,10 @@ asmlinkage long sys_ppoll(struct pollfd __user *, unsigned int,
 asmlinkage long sys_pipe2(int __user *, int);
 asmlinkage long sys_pipe(int __user *);
 
+/* hw4 */
+asmlinkage long sys_ssmem_attach(int id, int flags, size_t length);
+asmlinkage long sys_ssmem_detach(void *addr);
+
 int kernel_execve(const char *filename, char *const argv[], char *const envp[]);
 
 #endif

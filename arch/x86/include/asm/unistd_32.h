@@ -338,6 +338,10 @@
 #define __NR_dup3		330
 #define __NR_pipe2		331
 #define __NR_inotify_init1	332
+/* hw4 */
+#define __NR_ssmem_attach    333
+#define __NR_ssmem_detach    334
+
 
 #ifdef __KERNEL__
 
