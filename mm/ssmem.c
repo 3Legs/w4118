@@ -1,3 +1,7 @@
+#include <linux/syscalls.h>
+#include <linux/cred.h>
+#include <asm/uaccess.h>
+#include <asm/unistd.h>
 
 #define SSMEM_MAX 1024
 
@@ -26,6 +30,7 @@
    */
 
 SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
+	return 0;
 }
 
   /* Syscall 334. Unmap a shared memory segment mapped at the
@@ -37,4 +42,5 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
    * does not point to a ssmem segment.
    */
 SYSCALL_DEFINE1(ssmem_detach, void*, addr) {
+	return 0;
 }
