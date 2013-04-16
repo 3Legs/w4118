@@ -275,7 +275,7 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 	}
 
 _ATTACH_ROUTINE:
-
+   return addr;
 }
 
 SYSCALL_DEFINE1(ssmem_detach, void *, addr) {
