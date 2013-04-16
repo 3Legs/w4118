@@ -177,7 +177,7 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 	}
 
 	/* check if id exist */
-	if (SSMEM_TEST_ALLOC(id, ssmem_alloc))
+	if (SSMEM_TEST_ALLOC(id))
 		goto _ATTACH_ROUTINE;
 
 	if (flags & SSMEM_FLAG_CREATE) {
@@ -195,7 +195,7 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 		if (len == 0 || len > TASK_SIZE) {
 			printk(KERN_ALERT "ERROR in ssmem_attach: Invalid length!\n");
 			return -ENOMEM;
-		}p
+		}
 
 		if (current->mm->map_count > sysctl_max_map_count) {
 			printk(KERN_ALERT "ERROR in ssmem_attach: Too many mappings!\n");
