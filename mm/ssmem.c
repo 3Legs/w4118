@@ -59,6 +59,7 @@ struct ssmem_struct {
 	int id; /*ssmem ID */
 	int length; /* length of the ssmem */
 	int mappers; /* number of mappers */
+	pid_t master;
 	struct ssmem_vm *vm_list; /* list of mappers */
 	struct list_head list;
 };
@@ -263,13 +264,18 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 			return -ENOMEM;
 		}
 
-		SSMEM_SET_ALLOC(id);
+		SSMEM_SET_ALLOC(id); /* set allocation bit to 1 */
+
 		node->id = id;
 		node->length = length;
 		node->mappers = 1;
 		node->vm_list = kmalloc(sizeof(struct ssmem_vm), GFP_KERNEL);
 		node->vm_list->vma = vma;
-		list_add(&(node->list), ssmem_list_head);
+		node->master = current->pid;
+
+		list_add(&(node->list), ssmem_list_head); /* add node to ssmem list */
+
+		vma->vm_private_data = node; /* add node(ssmem_struct) to corresponding vma */
 
 		return addr;
 	}
