@@ -172,6 +172,8 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
       return -EINVAL;
    }
 
+   /* check if id exist */
+
    if (flags & SSMEM_FLAG_CREATE) {
       if (atomic_read(&ssmem_count) >= SSMEM_MAX) {
          printk(KERN_ALERT "ERROR in ssmem_attach: Too many ssmem exist.\n");
