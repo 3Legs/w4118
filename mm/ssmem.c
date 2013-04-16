@@ -67,6 +67,7 @@ struct ssmem_struct {
 /* function declare */
 
 static int ssmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
+static int ssmem_close(struct vm_area_struct *area);
 
 /* objects initialize */
 
@@ -76,7 +77,8 @@ struct ssmem_struct ssmem_head = {
 };
 
 static struct vm_operations_struct ssmem_vm_ops = {
-	.fault      = ssmem_fault,
+	.close = ssmem_close,
+	.fault = ssmem_fault,
 };
 
 struct list_head *ssmem_list_head = &(ssmem_head.list);
@@ -88,6 +90,12 @@ static int ssmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	return VM_FAULT_NOPAGE;
 }
+
+static int ssmem_close(struct vm_area_struct *area)
+{
+
+}
+
 
 static inline void
 __vma_link_list(struct mm_struct *mm, struct vm_area_struct *vma,
