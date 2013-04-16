@@ -205,7 +205,7 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
       if (flags & SSMEM_FLAG_EXEC) {
          vm_flags |= VM_EXEC;
       }
-
+      /*
       current->mm->free_area_cache = begin;
       addr = start_addr = begin;
 
@@ -220,6 +220,8 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
          }
          addr = vma->vm_end;
       }
+      */
+      addr = get_unmapped_area(NULL, 0, len, 0, vm_flags);
 
       if (addr & ~PAGE_MASK) {
          printk(KERN_ALERT "ERROR in ssmem_attach: VMA not aligned!");
