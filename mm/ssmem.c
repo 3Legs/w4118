@@ -119,6 +119,7 @@ __ssmem_fault_master(struct vm_area_struct *vma,
 	page = alloc_page(GFP_USER);
 	page_table = get_locked_pte(vma->vm_mm, (unsigned long)addr, &ptl);
 	get_page(page);
+
 	set_pte_at(vma->vm_mm, (unsigned long)addr, page_table, mk_pte(page, vma->vm_page_prot));
 
 	return 0;
@@ -184,7 +185,20 @@ static void
 __copy_page_table(struct vm_area_struct *source_vma,
 		  struct vm_area_struct *target_vma)
 {
+	unsigned long source_start = source_vma->vm_start;
+	unsigned long target_start = target_vma->vm_start;
+	unsigned long len = source_vma->vm_end - source_start;
+	unsigned long offset;
+	spinlock_t *ptl_source, *ptl_target;
+	pte_t *pte_source, *pte_target;
 
+	for (offset = 0; offset < len; offset += PAGE_SIZE) {
+		pte_source = get_locked_pte(source_vma->vm_mm, source_start + offset, &ptl_source);
+		if (!pte_none(*pte_source)) {
+			pte_target = get_locked_pte(target_vma->vm_mm, target_start + offset, &ptl_target);
+			set_pte_at(target_vma->vm_mm, target_start + offset, pte_target, *pte_source);
+		}
+	}
 }
 
 
@@ -418,21 +432,6 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 			vm_flags |= VM_EXEC;
 		}
 
-		/* current->mm->free_area_cache = begin;
-		addr = start_addr = begin;
-
-		for (vma = find_vma(current->mm, addr); ;vma = vma->vm_next) {
-			if (addr + len > TASK_SIZE) {
-				printk(KERN_ALERT "ERROR in ssmem_attach: Not enough memory!\n");
-				return -ENOMEM;
-			}
-			if (!vma || addr + len <= vma->vm_start) {
-				current->mm->free_area_cache = addr + len;
-				break;
-			}
-			addr = vma->vm_end;
-			} */
-
 		addr = get_unmapped_area(NULL, 0, len, 0, vm_flags);
 
 		if (addr & ~PAGE_MASK) {
@@ -457,12 +456,12 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 		vma->vm_start = addr;
 		vma->vm_end = addr + len;
 		vma->vm_flags = vm_flags;
+		vma->vm_page_prot = PAGE_SHARED;
 		vma->vm_ops = &ssmem_vm_ops;
 
 		vma_link(current->mm, vma, prev, rb_link, rb_parent);
 		current->mm->total_vm += len >> PAGE_SHIFT;
 
-		//make_pages_present(addr, addr+len);
 		node = kmalloc(sizeof(struct ssmem_struct), GFP_KERNEL);
 		if (!node) {
 			printk(KERN_ALERT "ERROR in ssmem_attach: kmalloc error!\n");
