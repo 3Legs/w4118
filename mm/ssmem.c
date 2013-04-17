@@ -198,10 +198,6 @@ __copy_page_table(struct vm_area_struct *source_vma,
 static void __assign_master(struct ssmem_struct *ssmem)
 {
 	struct ssmem_vm *cur, *next, *master_vm;
-	/* there's only one mapper, which has to be master */
-        /* we do nothing */
-	if (ssmem->mappers <= 1)
-		return;
 	/* need to lock ssmem list */
 	mutex_lock(&ssmem_list_lock);
 
@@ -279,26 +275,22 @@ static void  __do_munmap(struct vm_area_struct *area)
 static void ssmem_close(struct vm_area_struct *area)
 {
 	struct ssmem_struct *ssmem = area->vm_private_data;
-	struct mm_struct *mm = current->mm;
+	struct ssmem_vm *s_vm;
 
-	down_write(&mm->mmap_sem);
-	mutex_lock(&ssmem_lock); /* need to protect ssmem_struct */
-	if (SSMEM_MASTER(ssmem) == current->pid) {
-		__assign_master(ssmem);
+	printk(KERN_ALERT "In ssmem_close\n");
+	if (--ssmem->mappers) {
+		mutex_lock(&ssmem_lock); /* need to protect ssmem_struct */
+		if (SSMEM_MASTER(ssmem) == current->pid) {
+			__assign_master(ssmem);
+		}
+		s_vm = __ssmem_vm(area);
+		if (s_vm)
+			list_del(&s_vm->list);
+		mutex_unlock(&ssmem_lock);
+		/*__do_munmap(area);*/
+	} else {
+		__delete_ssmem(ssmem); 
 	}
-
-	list_del(&(__ssmem_vm(area)->list));
-	if ((--ssmem->mappers) == 0) {
-		/* the last(only) mappers, need to do actual close */
-		__do_munmap(area);
-		__delete_ssmem(ssmem);
-	}
-
-	mutex_unlock(&ssmem_lock);
-	up_write(&mm->mmap_sem);
-
-
-
 }
 
 
@@ -383,6 +375,7 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 	struct vm_area_struct *vma, *prev;
 	struct rb_node **rb_link, *rb_parent;
 	struct ssmem_struct *node;
+	struct ssmem_vm *vm_node;
 
 	if (id < 0 || id > SSMEM_MAX-1) {
 		printk(KERN_ALERT "ERROR in ssmem_attach: Invalid id.\n");
@@ -482,8 +475,14 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 		node->length = length;
 		node->mappers = 1;
 		node->vm_list = kmalloc(sizeof(struct ssmem_vm), GFP_KERNEL);
-		node->vm_list->vma = vma;
-		node->vm_list->owner = current->pid;
+		node->vm_list->vma = NULL;
+		node->vm_list->owner = 0;
+		INIT_LIST_HEAD(&node->vm_list->list);
+
+		vm_node = kmalloc(sizeof(struct ssmem_vm), GFP_KERNEL);
+		vm_node->vma = vma;
+		vm_node->owner = current->pid;
+		list_add(&vm_node->list, &node->vm_list->list);
 
 		node->master = current->pid;
 
@@ -518,8 +517,8 @@ SYSCALL_DEFINE1(ssmem_detach, void *, addr) {
 	if (!vma || !vma->vm_private_data) 
 /* no vma on this address or vma is not a ssmem segment*/
 		return -EFAULT;
-
+	down_write(&mm->mmap_sem);
 	ssmem_close(vma);
-
+	up_write(&mm->mmap_sem);
 	return 0;
 }
