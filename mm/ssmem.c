@@ -27,6 +27,7 @@
 #include <linux/rmap.h>
 #include <linux/mmu_notifier.h>
 #include <linux/bitmap.h>
+
 #include <asm/uaccess.h>
 #include <asm/cacheflush.h>
 #include <asm/tlb.h>
@@ -34,10 +35,12 @@
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
 
+#include "internal.h"
+
 /* macro define */
 #define SSMEM_TEST_ALLOC(id) test_bit(id, ssmem_alloc)
 #define SSMEM_SET_ALLOC(id) set_bit(id, ssmem_alloc)
-#define SSMEM_UNSET_ALLOC(id) unset_bit(id, ssmem_alloc)
+#define SSMEM_UNSET_ALLOC(id) clear_bit(id, ssmem_alloc)
 
 #define SSMEM_MASTER(ssmem) (ssmem->master)
 
@@ -88,6 +91,22 @@ static struct vm_operations_struct ssmem_vm_ops = {
 };
 
 struct list_head *ssmem_list_head = &(ssmem_head.list);
+
+static struct ssmem_vm *
+__ssmem_vm(struct vm_area_struct *vma)
+{
+	struct ssmem_vm *cur, *next;
+	struct ssmem_struct *ssmem = vma->vm_private_data;
+	if (!ssmem)
+		return NULL;
+
+	list_for_each_entry_safe(cur, next, &ssmem->vm_list->list, list) {
+		if (cur->vma == vma)
+			return cur;
+	}
+
+	return NULL;
+}
 
 static int ssmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
@@ -143,6 +162,13 @@ static void __assign_master(struct ssmem_struct *ssmem)
 	mutex_unlock(&ssmem_list_lock);
 }
 
+static inline void
+__delete_ssmem(struct ssmem_struct *ssmem) {
+	mutex_lock(&ssmem_list_lock);
+	SSMEM_UNSET_ALLOC(ssmem->id);
+	list_del(&(ssmem->list));
+	mutex_unlock(&ssmem_list_lock);
+}
 
 static void __unmap_region(struct mm_struct *mm, 
 		struct vm_area_struct *vma)
@@ -153,7 +179,7 @@ static void __unmap_region(struct mm_struct *mm,
 	lru_add_drain();
 	tlb = tlb_gather_mmu(mm, 0);
 	update_hiwater_rss(mm);
-	umap_vmas(&tlb, vma, vma->vm_start, vma->vm_end, &nr_accounted, NULL);
+	unmap_vmas(&tlb, vma, vma->vm_start, vma->vm_end, &nr_accounted, NULL);
 	vm_unacct_memory(nr_accounted);
 	free_pgtables(tlb, vma, vma->vm_start, vma->vm_end);
 	tlb_finish_mmu(tlb, vma->vm_start, vma->vm_end);
@@ -199,11 +225,17 @@ static void ssmem_close(struct vm_area_struct *area)
 		__assign_master(ssmem);
 	}
 
-	if (!(--ssmem->mappers)) {
+	list_del(&(__ssmem_vm(area)->list));
+	if ((--ssmem->mappers) == 0) {
 		/* the last(only) mappers, need to do actual close */
 		__do_munmap(area);
+		__delete_ssmem(ssmem);
 	}
+
 	mutex_unlock(&ssmem_lock);
+
+
+
 }
 
 
@@ -401,7 +433,7 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 	}
 
 _ATTACH_ROUTINE:
-   return addr;
+   return 0;
 }
 
 /*
@@ -415,7 +447,6 @@ _ATTACH_ROUTINE:
 SYSCALL_DEFINE1(ssmem_detach, void *, addr) {
 	struct vm_area_struct *vma, *prev;
 	struct mm_struct *mm = current->mm;
-	unsigned long end;
 	unsigned long start = (unsigned long) addr;
 
 	if ((start & ~PAGE_MASK) || start > TASK_SIZE)
