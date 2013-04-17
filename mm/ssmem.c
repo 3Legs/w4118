@@ -63,8 +63,8 @@ struct ssmem_vm {
 
 struct ssmem_struct {
 	int id; /*ssmem ID */
-	int length; /* length of the ssmem */
-	int mappers; /* number of mappers */
+	size_t length; /* length of the ssmem */
+	unsigned int mappers; /* number of mappers */
 	pid_t master;
 	struct ssmem_vm *vm_list; /* list of mappers */
 	struct list_head list;
@@ -126,14 +126,14 @@ static void __assign_master(struct ssmem_struct *ssmem)
 	/* need to lock ssmem list */
 	mutex_lock(&ssmem_list_lock);
 
-	list_for_each_entry(cur, next, &ssmem->vm_list->list, list) {
+	list_for_each_entry_safe(cur, next, &ssmem->vm_list->list, list) {
 		if (SSMEM_MASTER(ssmem) == cur->owner) {
 			master_vm = cur;
 			break;
 		}
 	}
 
-	list_for_each_entry(cur, next, &ssmem->vm_list->list, list) {
+	list_for_each_entry_safe(cur, next, &ssmem->vm_list->list, list) {
 		if (SSMEM_MASTER(ssmem) != cur->owner) {
 			__copy_page_table(master_vm->vma, cur->vma);
 			ssmem->master = cur->owner;
@@ -143,16 +143,43 @@ static void __assign_master(struct ssmem_struct *ssmem)
 	mutex_unlock(&ssmem_list_lock);
 }
 
+
+static void __unmap_region(struct mm_struct *mm, 
+		struct vm_area_struct *vma)
+{
+	struct mmu_gather *tlb;
+	unsigned long nr_accounted = 0;
+
+	lru_add_drain();
+	tlb = tlb_gather_mmu(mm, 0);
+	update_hiwater_rss(mm);
+	umap_vmas(&tlb, vma, vma->vm_start, vma->vm_end, &nr_accounted, NULL);
+	vm_unacct_memory(nr_accounted);
+	free_pgtables(tlb, vma, vma->vm_start, vma->vm_end);
+	tlb_finish_mmu(tlb, vma->vm_start, vma->vm_end);
+}
+
 /*
  * __do_close: actual close ssmem routine
  * 
- * 1. If process is the master, need to assign new master
- * 2. Unmap the pages.
- * 3. Remove vma from mm
+ * 1. Unmap the pages.
+ * 2. Remove vma from mm
  */
-static void __do_close(struct vm_area_struct *area)
+static void  __do_munmap(struct vm_area_struct *area)
 {
+	struct mm_struct *mm = current->mm;
+	unsigned long addr = area->vm_start;
 
+	if (mm->locked_vm) {
+		mm->locked_vm -= vma_pages(area);
+		munlock_vma_pages_all(area);
+	}
+	
+	mm->unmap_area(mm, addr);
+	mm->mmap_cache = NULL;
+
+	/* get rid of page table information;*/ 
+	__unmap_region(mm, area);
 }
 
 /*
@@ -172,9 +199,9 @@ static void ssmem_close(struct vm_area_struct *area)
 		__assign_master(ssmem);
 	}
 
-	if (!--area->vm_private_data->mappers) {
+	if (!(--ssmem->mappers)) {
 		/* the last(only) mappers, need to do actual close */
-		__do_close(area);
+		__do_munmap(area);
 	}
 	mutex_unlock(&ssmem_lock);
 }
@@ -255,7 +282,7 @@ find_vma_prepare(struct mm_struct *mm, unsigned long addr,
 }
 
 SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
-	unsigned long len = length;
+	size_t len = length;
 	unsigned long begin = TASK_UNMAPPED_BASE;
 	unsigned long addr, start_addr;
 	unsigned long vm_flags = 0;
@@ -377,6 +404,31 @@ _ATTACH_ROUTINE:
    return addr;
 }
 
+/*
+ * ssmem_detach
+ *
+ * 1. If caller is master, we need to re-assign master
+ * 2. If it's the last one attached, we need to delete segment
+ * 3. Remove vma from caller's mm
+ *
+ */
 SYSCALL_DEFINE1(ssmem_detach, void *, addr) {
+	struct vm_area_struct *vma, *prev;
+	struct mm_struct *mm = current->mm;
+	unsigned long end;
+	unsigned long start = (unsigned long) addr;
+
+	if ((start & ~PAGE_MASK) || start > TASK_SIZE)
+		return -EFAULT;
+
+	vma = find_vma_prev(mm, start, &prev);
+	if (!vma || !vma->vm_private_data) 
+/* no vma on this address or vma is not a ssmem segment*/
+		return -EFAULT;
+
+	down_write(&mm->mmap_sem);
+	ssmem_close(vma);
+	up_write(&mm->mmap_sem);
+
 	return 0;
 }
