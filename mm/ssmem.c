@@ -108,9 +108,69 @@ __ssmem_vm(struct vm_area_struct *vma)
 	return NULL;
 }
 
+static int 
+__ssmem_fault_master(struct vm_area_struct *vma,
+	struct ssmem_struct *data, void *addr)
+{
+	struct page *page;
+	pte_t *page_table;
+	spinlock_t *ptl;
+
+	page = alloc_page(GFP_USER);
+	page_table = get_locked_pte(vma->vm_mm, (unsigned long)addr, &ptl);
+	get_page(page);
+	set_pte_at(vma->vm_mm, (unsigned long)addr, page_table, mk_pte(page, vma->vm_page_prot));
+
+	return 0;
+}
+
+static int 
+__ssmem_fault_slave(struct vm_area_struct *vma_s, struct vm_area_struct *vma_m,
+	struct ssmem_struct *data, void *addr)
+{
+	spinlock_t *ptl_s, *ptl_m;
+	pte_t *pte_s, *pte_m;
+
+	pte_s = get_locked_pte(vma_s->vm_mm, (unsigned long)addr, &ptl_s);
+	pte_m = get_locked_pte(vma_m->vm_mm, (unsigned long)(vma_m->vm_start + addr - vma_s->vm_start), &ptl_m);
+
+	if (pte_none(*pte_m)) {
+		__ssmem_fault_master(vma_m, data, vma_m->vm_start + addr - vma_s->vm_start);
+	}
+
+	set_pte_at(vma_s->vm_mm, (unsigned long)addr, pte_s, *pte_m);
+
+	return 0;
+}
+
 static int ssmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
+	struct ssmem_struct *data = vma->vm_private_data;
+	int result;
+	struct ssmem_vm *cur, *next, *master_vm = NULL;
 
+	mutex_lock(&ssmem_lock);
+	if (data->master == current->pid) {
+		result = __ssmem_fault_master(vma, data, vmf->virtual_address);
+	} else {
+		mutex_lock(&ssmem_list_lock);
+
+		list_for_each_entry_safe(cur, next, &data->vm_list->list, list) {
+			if (SSMEM_MASTER(data) == cur->owner) {
+				master_vm = cur;
+				break;
+			}
+		}
+
+		mutex_unlock(&ssmem_list_lock);
+
+		result = __ssmem_fault_slave(vma, master_vm->vma, data, vmf->virtual_address);
+	}
+	mutex_unlock(&ssmem_lock);
+
+	if (!result) {
+		printk("ERROR in ssmem_fault!\n");
+	}
 	return VM_FAULT_NOPAGE;
 }
 
@@ -315,8 +375,7 @@ find_vma_prepare(struct mm_struct *mm, unsigned long addr,
 
 SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 	size_t len = length;
-	unsigned long begin = TASK_UNMAPPED_BASE;
-	unsigned long addr, start_addr;
+	unsigned long addr;
 	unsigned long vm_flags = 0;
 	struct vm_area_struct *vma, *prev;
 	struct rb_node **rb_link, *rb_parent;
