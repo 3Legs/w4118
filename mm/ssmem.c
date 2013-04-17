@@ -37,6 +37,9 @@
 /* macro define */
 #define SSMEM_TEST_ALLOC(id) test_bit(id, ssmem_alloc)
 #define SSMEM_SET_ALLOC(id) set_bit(id, ssmem_alloc)
+#define SSMEM_UNSET_ALLOC(id) unset_bit(id, ssmem_alloc)
+
+#define SSMEM_MASTER(ssmem) (ssmem->master)
 
 #define SSMEM_MAX 1024
 #define SSMEM_FLAG_CREATE   0x1
@@ -46,12 +49,15 @@
 /* global variable */
 
 static atomic_t ssmem_count = ATOMIC_INIT(0);
+DEFINE_MUTEX(ssmem_lock);
+DEFINE_MUTEX(ssmem_list_lock);
 DECLARE_BITMAP(ssmem_alloc, SSMEM_MAX);
 
 /* structures define */
 
 struct ssmem_vm {
 	struct vm_area_struct *vma;
+	pid_t owner;
 	struct list_head list;
 };
 
@@ -67,7 +73,7 @@ struct ssmem_struct {
 /* function declare */
 
 static int ssmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
-static int ssmem_close(struct vm_area_struct *area);
+static void ssmem_close(struct vm_area_struct *area);
 
 /* objects initialize */
 
@@ -83,17 +89,94 @@ static struct vm_operations_struct ssmem_vm_ops = {
 
 struct list_head *ssmem_list_head = &(ssmem_head.list);
 
-/* function definations */
-
 static int ssmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 
 	return VM_FAULT_NOPAGE;
 }
 
-static int ssmem_close(struct vm_area_struct *area)
+
+/*
+ * __copy_page_table
+ * 
+ * copy one vma's page table entries to another vma
+ */
+static void 
+__copy_page_table(struct vm_area_struct *source_vma,
+		  struct vm_area_struct *target_vma)
 {
 
+}
+
+
+/*
+ * __assign_master
+ *
+ * assign the master of ssmem to another process
+ * and copy old master's pte to new master.
+ *
+ */
+static void __assign_master(struct ssmem_struct *ssmem)
+{
+	struct ssmem_vm *cur, *next, *master_vm;
+	/* there's only one mapper, which has to be master */
+        /* we do nothing */
+	if (ssmem->mappers <= 1)
+		return;
+	/* need to lock ssmem list */
+	mutex_lock(&ssmem_list_lock);
+
+	list_for_each_entry(cur, next, &ssmem->vm_list->list, list) {
+		if (SSMEM_MASTER(ssmem) == cur->owner) {
+			master_vm = cur;
+			break;
+		}
+	}
+
+	list_for_each_entry(cur, next, &ssmem->vm_list->list, list) {
+		if (SSMEM_MASTER(ssmem) != cur->owner) {
+			__copy_page_table(master_vm->vma, cur->vma);
+			ssmem->master = cur->owner;
+			break;
+		}
+	}
+	mutex_unlock(&ssmem_list_lock);
+}
+
+/*
+ * __do_close: actual close ssmem routine
+ * 
+ * 1. If process is the master, need to assign new master
+ * 2. Unmap the pages.
+ * 3. Remove vma from mm
+ */
+static void __do_close(struct vm_area_struct *area)
+{
+
+}
+
+/*
+ * ssmem_close
+ * callback routine when a process need to close the vma
+ * 
+ * 1. Check whether the current ssmem_struct is shared by
+ *    processes.
+ * 2. If it's the last(only) one, do the actual close
+ */
+static void ssmem_close(struct vm_area_struct *area)
+{
+	struct ssmem_struct *ssmem = area->vm_private_data;
+
+	mutex_lock(&ssmem_lock); /* need to protect ssmem_struct */
+	if (SSMEM_MASTER(ssmem) == current->pid) {
+		__assign_master(ssmem);
+	}
+
+	if (!--area->vm_private_data->mappers) {
+		/* the last(only) mappers, need to do actual close */
+		__do_close(area);
+	}
+	mutex_unlock(&ssmem_lock);
 }
 
 
@@ -279,6 +362,8 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 		node->mappers = 1;
 		node->vm_list = kmalloc(sizeof(struct ssmem_vm), GFP_KERNEL);
 		node->vm_list->vma = vma;
+		node->vm_list->owner = current->pid;
+
 		node->master = current->pid;
 
 		list_add(&(node->list), ssmem_list_head); /* add node to ssmem list */
