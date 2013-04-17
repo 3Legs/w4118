@@ -220,8 +220,9 @@ static void ssmem_close(struct vm_area_struct *area)
 {
 	struct ssmem_struct *ssmem = area->vm_private_data;
 	struct mm_struct *mm = current->mm;
-
+	printk(KERN_ALERT "In ssmem_close\n");
 	down_write(&mm->mmap_sem);
+	printk(KERN_ALERT "Hold mmap_semaphore\n");
 	mutex_lock(&ssmem_lock); /* need to protect ssmem_struct */
 	if (SSMEM_MASTER(ssmem) == current->pid) {
 		__assign_master(ssmem);
