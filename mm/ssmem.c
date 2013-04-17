@@ -92,8 +92,19 @@ static struct vm_operations_struct ssmem_vm_ops = {
 
 struct list_head *ssmem_list_head = &(ssmem_head.list);
 
+static struct ssmem_struct *
+__get_ssmem(int id)
+{
+	struct ssmem_struct *cur, *next;
+	list_for_each_entry_safe(cur, next, &(ssmem_head.list), list) {
+		if (cur->id == id)
+			return cur;
+	}
+	return NULL;
+}
+
 static struct ssmem_vm *
-__ssmem_vm(struct vm_area_struct *vma)
+__get_ssmem_vm(struct vm_area_struct *vma)
 {
 	struct ssmem_vm *cur, *next;
 	struct ssmem_struct *ssmem = vma->vm_private_data;
@@ -223,7 +234,7 @@ static void ssmem_close(struct vm_area_struct *area)
 		if (SSMEM_MASTER(ssmem) == current->pid) {
 			__assign_master(ssmem);
 		}
-		s_vm = __ssmem_vm(area);
+		s_vm = __get_ssmem_vm(area);
 		if (s_vm)
 			list_del(&s_vm->list);
 		mutex_unlock(&ssmem_lock);
@@ -308,6 +319,43 @@ find_vma_prepare(struct mm_struct *mm, unsigned long addr,
 	return vma;
 }
 
+static inline struct ssmem_struct * __create_ssmem(int id, size_t length)
+{
+	struct ssmem_struct *node;
+
+	node = kmalloc(sizeof(struct ssmem_struct), GFP_KERNEL);
+	if (!node) {
+		printk(KERN_ALERT "ERROR in ssmem_attach: kmalloc error!\n");
+		return NULL;
+	}
+
+	node->id = id;
+	node->length = length;
+	node->mappers = 1;
+	node->vm_list = kmalloc(sizeof(struct ssmem_vm), GFP_KERNEL);
+	node->vm_list->vma = NULL;
+	node->vm_list->owner = 0;
+	node->master = current->pid;
+
+	INIT_LIST_HEAD(&node->vm_list->list);
+
+
+	return node;
+}
+
+static inline struct ssmem_vm *__create_ssmem_vm(struct vm_area_struct *vma)
+{
+	struct ssmem_vm *vm_node;
+	vm_node = kmalloc(sizeof(struct ssmem_vm), GFP_KERNEL);
+	if (!vm_node) {
+		return NULL;
+	}
+	vm_node->vma = vma;
+	vm_node->owner = current->pid;
+
+	return vm_node;
+}
+
 SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 	size_t len = length;
 	unsigned long addr;
@@ -316,6 +364,7 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 	struct rb_node **rb_link, *rb_parent;
 	struct ssmem_struct *node;
 	struct ssmem_vm *vm_node;
+	struct ssmem_struct *ssmem;
 
 	if (id < 0 || id > SSMEM_MAX-1) {
 		printk(KERN_ALERT "ERROR in ssmem_attach: Invalid id.\n");
@@ -358,21 +407,6 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 			vm_flags |= VM_EXEC;
 		}
 
-		/* current->mm->free_area_cache = begin;
-		addr = start_addr = begin;
-
-		for (vma = find_vma(current->mm, addr); ;vma = vma->vm_next) {
-			if (addr + len > TASK_SIZE) {
-				printk(KERN_ALERT "ERROR in ssmem_attach: Not enough memory!\n");
-				return -ENOMEM;
-			}
-			if (!vma || addr + len <= vma->vm_start) {
-				current->mm->free_area_cache = addr + len;
-				break;
-			}
-			addr = vma->vm_end;
-			} */
-
 		addr = get_unmapped_area(NULL, 0, len, 0, vm_flags);
 
 		if (addr & ~PAGE_MASK) {
@@ -403,38 +437,89 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 		current->mm->total_vm += len >> PAGE_SHIFT;
 
 		//make_pages_present(addr, addr+len);
-		node = kmalloc(sizeof(struct ssmem_struct), GFP_KERNEL);
+		SSMEM_SET_ALLOC(id); /* set allocation bit to 1 */
+		node = __create_ssmem(id, length);
 		if (!node) {
-			printk(KERN_ALERT "ERROR in ssmem_attach: kmalloc error!\n");
 			return -ENOMEM;
 		}
-
-		SSMEM_SET_ALLOC(id); /* set allocation bit to 1 */
-
-		node->id = id;
-		node->length = length;
-		node->mappers = 1;
-		node->vm_list = kmalloc(sizeof(struct ssmem_vm), GFP_KERNEL);
-		node->vm_list->vma = NULL;
-		node->vm_list->owner = 0;
-		INIT_LIST_HEAD(&node->vm_list->list);
-
-		vm_node = kmalloc(sizeof(struct ssmem_vm), GFP_KERNEL);
-		vm_node->vma = vma;
-		vm_node->owner = current->pid;
+		list_add(&(node->list), ssmem_list_head);
+		
+		vm_node = __create_ssmem_vm(vma);
+		if (!vm_node) {
+			return -ENOMEM;
+		}
 		list_add(&vm_node->list, &node->vm_list->list);
 
-		node->master = current->pid;
-
-		list_add(&(node->list), ssmem_list_head); /* add node to ssmem list */
-
 		vma->vm_private_data = node; /* add node(ssmem_struct) to corresponding vma */
-
 		return addr;
 	}
 
 _ATTACH_ROUTINE:
-   return 0;
+	ssmem = __get_ssmem(id);
+
+	if (!ssmem) {
+		/* this should not happen */
+		printk(KERN_ALERT "SOMETHING WRONG!\n");
+		return -EFAULT;
+	}
+
+	len = PAGE_ALIGN(ssmem->length);
+
+	if (atomic_read(&ssmem_count) >= SSMEM_MAX) {
+		printk(KERN_ALERT "ERROR in ssmem_attach: Too many ssmem exist.\n");
+		return -EINVAL;
+	}
+
+	if (current->mm->map_count > sysctl_max_map_count) {
+		printk(KERN_ALERT "ERROR in ssmem_attach: Too many mappings!\n");
+		return -ENOMEM;
+	}
+
+	vm_flags |= (VM_SHARED|VM_READ);
+
+	if (flags & SSMEM_FLAG_WRITE) {
+		vm_flags |= VM_WRITE;
+	}
+
+	if (flags & SSMEM_FLAG_EXEC) {
+		vm_flags |= VM_EXEC;
+	}
+
+	addr = get_unmapped_area(NULL, 0, len, 0, vm_flags);
+
+	if (addr & ~PAGE_MASK) {
+		printk(KERN_ALERT "ERROR in ssmem_attach: VMA not aligned!");
+		return -EFAULT;
+	}
+
+	for ( ; ; ) {
+		vma = find_vma_prepare(current->mm, addr, &prev, &rb_link, &rb_parent);
+		if (!vma || vma->vm_start >= addr+len)
+			break;
+		/* ssmem_unmap() */
+	}
+
+	vma = kmem_cache_zalloc(vm_area_cachep, GFP_KERNEL);
+	if (!vma) {
+		printk(KERN_ALERT "ERROR in ssmem: kmem_cache_zalloc error!\n");
+		return -ENOMEM;
+	}
+
+	vma->vm_mm = current->mm;
+	vma->vm_start = addr;
+	vma->vm_end = addr + len;
+	vma->vm_flags = vm_flags;
+	vma->vm_ops = &ssmem_vm_ops;
+
+	vm_node = __create_ssmem_vm(vma);
+	if (!vm_node) {
+		return -ENOMEM;
+	}
+	list_add(&vm_node->list, &ssmem->vm_list->list);
+
+	vma->vm_private_data = ssmem; /* add node(ssmem_struct) to corresponding vma */
+	return addr;
+
 }
 
 /*
