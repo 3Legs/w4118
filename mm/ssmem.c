@@ -382,7 +382,7 @@ static void ssmem_close(struct vm_area_struct *area)
 			__assign_master(ssmem);
 		}
 	} else {
-		printk(KERN_ALERT "PID %d is the last one out\n");
+		printk(KERN_ALERT "PID %d is the last one out\n", current->pid);
 		__delete_ssmem(ssmem); 
 	}
 	mutex_unlock(&ssmem->ssmem_vm_list_lock);
