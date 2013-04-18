@@ -499,7 +499,7 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
  *
  */
 SYSCALL_DEFINE1(ssmem_detach, void *, addr) {
-	struct vm_area_struct *vma, *prev;
+	struct vm_area_struct *vma;
 	struct mm_struct *mm = current->mm;
 	unsigned long start = (unsigned long) addr;
 
