@@ -332,8 +332,6 @@ __detach_ssmem_vma_to_be_unmapped(struct mm_struct *mm,
 
 	rb_erase(&vma->vm_rb, &mm->mm_rb);
 	mm->map_count--;
-	
-	anon_vma_unlink(vma);
 
 	next = vma->vm_next;
 	prev->vm_next = next;
