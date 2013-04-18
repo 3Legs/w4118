@@ -71,8 +71,9 @@ struct ssmem_struct {
 	atomic_t mappers; /* number of mappers */
 	pid_t master;
 	struct ssmem_vm *vm_list; /* list of mappers */
+	struct anon_vma *rmap; /* reverse map */
 	struct list_head list;
-        struct mutex ssmem_vm_list_lock;
+    struct mutex ssmem_vm_list_lock;
 };
 
 /* function declare */
@@ -93,6 +94,11 @@ static struct vm_operations_struct ssmem_vm_ops = {
 };
 
 struct list_head *ssmem_list_head = &(ssmem_head.list);
+
+static void ssmem_set_anon(struct ssmem_struct *ssmem, struct anon_vma *anon)
+{
+	ssmem->rmap = anon;
+}
 
 static struct ssmem_struct *
 __get_ssmem(int id)
@@ -128,12 +134,29 @@ __ssmem_fault_master(struct vm_area_struct *vma,
 	struct page *page;
 	pte_t *page_table;
 	spinlock_t *ptl;
+	pte_t entry;
+
+	if (unlikely(anon_vma_prepare(vma))) {
+		printk(KERN_ALERT "ERROR after anon_vma_prepare!\n");
+		return VM_FAULT_OOM;
+	}
+
+	anon_vma_link(vma);
+	ssmem_set_anon(data, vma->anon_vma);
 
 	page = alloc_page(GFP_USER);
+	if (!page)
+		return VM_FAULT_OOM;
 	page_table = get_locked_pte(vma->vm_mm, (unsigned long)addr, &ptl);
+	entry = mk_pte(page, vma->vm_page_prot);
+	if (likely(vma->vm_flags & VM_WRITE))
+		entry = pte_mkwrite(entry);
 	get_page(page);
 
-	set_pte_at(vma->vm_mm, (unsigned long)addr, page_table, mk_pte(page, vma->vm_page_prot));
+	inc_mm_counter(vma->vm_mm, anon_rss);
+	page_add_new_anon_rmap(page, vma, (unsigned long)addr);
+	set_pte_at(vma->vm_mm, (unsigned long)addr, page_table, entry);
+	pte_unmap_unlock(page_table, ptl);
 
 	return 0;
 }
@@ -153,6 +176,8 @@ __ssmem_fault_slave(struct vm_area_struct *vma_s, struct vm_area_struct *vma_m,
 	}
 
 	set_pte_at(vma_s->vm_mm, (unsigned long)addr, pte_s, *pte_m);
+	pte_unmap_unlock(pte_m, ptl_m);
+	pte_unmap_unlock(pte_s, ptl_s);
 
 	return 0;
 }
@@ -208,7 +233,9 @@ __copy_page_table(struct vm_area_struct *source_vma,
 		if (!pte_none(*pte_source)) {
 			pte_target = get_locked_pte(target_vma->vm_mm, target_start + offset, &ptl_target);
 			set_pte_at(target_vma->vm_mm, target_start + offset, pte_target, *pte_source);
+			pte_unmap_unlock(pte_target, ptl_target);
 		}
+		pte_unmap_unlock(pte_source, ptl_source);
 	}
 }
 
@@ -279,6 +306,7 @@ static void ssmem_close(struct vm_area_struct *area)
 		__delete_ssmem(ssmem); 
 	}
 	mutex_unlock(&ssmem->ssmem_vm_list_lock);
+	printk(KERN_ALERT "Count %d\n", atomic_read(&ssmem_count));
 }
 
 
@@ -375,7 +403,6 @@ static inline struct ssmem_struct * __create_ssmem(int id, size_t length)
 	node->master = current->pid;
 	INIT_LIST_HEAD(&node->vm_list->list);
 
-
 	return node;
 }
 
@@ -396,6 +423,7 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 	size_t len = length;
 	unsigned long addr;
 	unsigned long vm_flags = 0;
+	int valid_create = 0;
 	struct vm_area_struct *vma, *prev;
 	struct rb_node **rb_link, *rb_parent;
 	struct ssmem_struct *node;
@@ -417,7 +445,7 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 		return -ENOMEM;
 	}
 
-	/* If id dosen't exist */
+	/* If id doesn't exist */
 	if (!SSMEM_TEST_ALLOC(id)) {
 		if (length == 0) {
 			printk(KERN_ALERT "ERROR in ssmem_attach: Invalid length!\n");
@@ -435,6 +463,7 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 			return -ENOMEM;
 		}
 
+		valid_create = 1;
 		mutex_lock(&ssmem_list_lock);
 		list_add(&(node->list), ssmem_list_head);
 		SSMEM_SET_ALLOC(id); /* set allocation bit to 1 */
@@ -442,6 +471,7 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 		mutex_unlock(&ssmem_list_lock);
 
 	} else {
+		valid_create = 0;
 		node = __get_ssmem(id);
 		if (!node) {
 			/* this should not happen */
@@ -484,6 +514,11 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 	vma->vm_page_prot = PAGE_SHARED;
 	vma->vm_ops = &ssmem_vm_ops;
 
+	if (!valid_create) {
+		vma->anon_vma = node->rmap;
+		anon_vma_link(vma);
+	}
+
 	vma_link(current->mm, vma, prev, rb_link, rb_parent);
 	current->mm->total_vm += len >> PAGE_SHIFT;
 		
@@ -497,6 +532,7 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 	atomic_inc(&node->mappers);
 	mutex_unlock(&node->ssmem_vm_list_lock);
 	vma->vm_private_data = node;
+
 	return addr;
 }
 
