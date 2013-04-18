@@ -300,7 +300,7 @@ __unmap_ssmem_region(struct mm_struct *mm, struct vm_area_struct *vma)
 	update_hiwater_rss(mm);
 	unmap_vmas(&tlb, vma, start, end, &nr_accounted, NULL);
 	vm_unacct_memory(nr_accounted);
-	free_pgtables(tlb, vma, start, end);
+	/* free_pgtables(tlb, vma, start, end); */
 	tlb_finish_mmu(tlb, start, end);
 }
 
