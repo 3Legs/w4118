@@ -43,6 +43,7 @@
 #define SSMEM_UNSET_ALLOC(id) clear_bit(id, ssmem_alloc)
 
 #define SSMEM_MASTER(ssmem) (ssmem->master)
+#define deb(a) printk(KERN_ALERT "%d\n", a)
 
 #define SSMEM_MAX 1024
 #define SSMEM_FLAG_CREATE   0x1
@@ -126,12 +127,12 @@ __ssmem_fault_master(struct vm_area_struct *vma,
 	struct page *page;
 	pte_t *page_table;
 	spinlock_t *ptl;
-
-	page = alloc_page(GFP_USER);
-	page_table = get_locked_pte(vma->vm_mm, (unsigned long)addr, &ptl);
+deb(1);
+	page = alloc_page(GFP_USER);deb(2);
+	page_table = get_locked_pte(vma->vm_mm, (unsigned long)addr, &ptl);deb(3);
 	get_page(page);
-
-	set_pte_at(vma->vm_mm, (unsigned long)addr, page_table, mk_pte(page, vma->vm_page_prot));
+deb(4);
+	set_pte_at(vma->vm_mm, (unsigned long)addr, page_table, mk_pte(page, vma->vm_page_prot));deb(5);
 
 	return 0;
 }
@@ -180,7 +181,7 @@ static int ssmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	}
 	mutex_unlock(&ssmem_lock);
 
-	if (!result) {
+	if (result) {
 		printk("ERROR in ssmem_fault!\n");
 	}
 	return VM_FAULT_NOPAGE;
