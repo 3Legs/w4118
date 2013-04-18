@@ -526,6 +526,10 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 
 	/* If id doesn't exist */
 	if (!SSMEM_TEST_ALLOC(id)) {
+		if (!(flags & SSMEM_FLAG_CREATE)) {
+			printk(KERN_ALERT "ERROR in ssmem_attach: Invalid id!\n");			
+			return -EINVAL;
+		}
 		if (length == 0) {
 			printk(KERN_ALERT "ERROR in ssmem_attach: Invalid length!\n");
 			return -EINVAL;
