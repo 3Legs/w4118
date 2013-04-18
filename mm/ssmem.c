@@ -248,6 +248,7 @@ __delete_ssmem(struct ssmem_struct *ssmem) {
 	mutex_lock(&ssmem_list_lock);
 	SSMEM_UNSET_ALLOC(ssmem->id);
 	list_del(&(ssmem->list));
+	atomic_dec(&ssmem_count);
 	mutex_unlock(&ssmem_list_lock);
 }
 
@@ -437,6 +438,7 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 		mutex_lock(&ssmem_list_lock);
 		list_add(&(node->list), ssmem_list_head);
 		SSMEM_SET_ALLOC(id); /* set allocation bit to 1 */
+		atomic_inc(&ssmem_count);
 		mutex_unlock(&ssmem_list_lock);
 
 	} else {
