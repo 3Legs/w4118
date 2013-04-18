@@ -232,6 +232,7 @@ __copy_page_table(struct vm_area_struct *source_vma,
 	unsigned long target_start = target_vma->vm_start;
 	unsigned long len = source_vma->vm_end - source_start;
 	unsigned long offset;
+	struct page *page;
 	spinlock_t *ptl_source, *ptl_target;
 	pte_t *pte_source, *pte_target;
 
@@ -644,10 +645,9 @@ SYSCALL_DEFINE1(ssmem_detach, void *, addr) {
 		return -EFAULT;
 	}
 
-	
 	down_write(&mm->mmap_sem);
-	__do_ssmem_munmap(vma);
 	ssmem_close(vma);
+	__do_ssmem_munmap(vma);
 	up_write(&mm->mmap_sem);
 	return 0;
 
