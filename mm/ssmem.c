@@ -67,7 +67,7 @@ struct ssmem_vm {
 struct ssmem_struct {
 	int id; /*ssmem ID */
 	size_t length; /* length of the ssmem */
-	unsigned int mappers; /* number of mappers */
+	atomic_t mappers; /* number of mappers */
 	pid_t master;
 	struct ssmem_vm *vm_list; /* list of mappers */
 	struct list_head list;
@@ -264,13 +264,15 @@ static void ssmem_close(struct vm_area_struct *area)
 	struct ssmem_struct *ssmem = area->vm_private_data;
 	struct ssmem_vm *s_vm;
 
-	if (--ssmem->mappers) {
+	if (atomic_dec_return(&ssmem->mappers)) {
 		if (SSMEM_MASTER(ssmem) == current->pid) {
 			__assign_master(ssmem);
 		}
 		s_vm = __get_ssmem_vm(area);
-		if (s_vm)
+		if (s_vm) {
 			list_del(&s_vm->list);
+			atomic_dec(&ssmem->mappers);
+		}
 	} else {
 		__delete_ssmem(ssmem); 
 	}
@@ -363,7 +365,7 @@ static inline struct ssmem_struct * __create_ssmem(int id, size_t length)
 
 	node->id = id;
 	node->length = length;
-	node->mappers = 1;
+	atomic_set(&node->mappers, 1);
 	node->vm_list = kmalloc(sizeof(struct ssmem_vm), GFP_KERNEL);
 	node->vm_list->vma = NULL;
 	node->vm_list->owner = 0;
@@ -486,6 +488,7 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 	}
 
 	list_add(&vm_node->list, &node->vm_list->list);
+	atomic_inc(&node->mappers);
 	vma->vm_private_data = node;
 	return addr;
 }
