@@ -39,6 +39,7 @@
 
 /* macro define */
 #define SSMEM_TEST_ALLOC(id) test_bit(id, ssmem_alloc)
+
 #define SSMEM_SET_ALLOC(id) set_bit(id, ssmem_alloc)
 #define SSMEM_UNSET_ALLOC(id) clear_bit(id, ssmem_alloc)
 
@@ -53,7 +54,6 @@
 /* global variable */
 
 static atomic_t ssmem_count = ATOMIC_INIT(0);
-DEFINE_MUTEX(ssmem_lock);
 DEFINE_MUTEX(ssmem_list_lock);
 DECLARE_BITMAP(ssmem_alloc, SSMEM_MAX);
 
@@ -72,6 +72,7 @@ struct ssmem_struct {
 	pid_t master;
 	struct ssmem_vm *vm_list; /* list of mappers */
 	struct list_head list;
+        struct mutex ssmem_vm_list_lock;
 };
 
 /* function declare */
@@ -162,11 +163,10 @@ static int ssmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	int result;
 	struct ssmem_vm *cur, *next, *master_vm = NULL;
 
-	mutex_lock(&ssmem_lock);
 	if (data->master == current->pid) {
 		result = __ssmem_fault_master(vma, data, vmf->virtual_address);
 	} else {
-		mutex_lock(&ssmem_list_lock);
+		mutex_lock(&data->ssmem_vm_list_lock);
 
 		list_for_each_entry_safe(cur, next, &data->vm_list->list, list) {
 			if (SSMEM_MASTER(data) == cur->owner) {
@@ -175,11 +175,10 @@ static int ssmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 			}
 		}
 
-		mutex_unlock(&ssmem_list_lock);
+		mutex_unlock(&data->ssmem_vm_list_lock);
 
 		result = __ssmem_fault_slave(vma, master_vm->vma, data, vmf->virtual_address);
 	}
-	mutex_unlock(&ssmem_lock);
 
 	if (result) {
 		printk("ERROR in ssmem_fault!\n");
@@ -225,7 +224,7 @@ static void __assign_master(struct ssmem_struct *ssmem)
 {
 	struct ssmem_vm *cur, *next, *master_vm;
 	/* need to lock ssmem list */
-	mutex_lock(&ssmem_list_lock);
+	mutex_lock(&ssmem->ssmem_vm_list_lock);
 
 	list_for_each_entry_safe(cur, next, &ssmem->vm_list->list, list) {
 		if (SSMEM_MASTER(ssmem) == cur->owner) {
@@ -241,7 +240,7 @@ static void __assign_master(struct ssmem_struct *ssmem)
 			break;
 		}
 	}
-	mutex_unlock(&ssmem_list_lock);
+	mutex_unlock(&ssmem->ssmem_vm_list_lock);
 }
 
 static inline void
@@ -252,44 +251,6 @@ __delete_ssmem(struct ssmem_struct *ssmem) {
 	mutex_unlock(&ssmem_list_lock);
 }
 
-static void __unmap_region(struct mm_struct *mm, 
-		struct vm_area_struct *vma)
-{
-	struct mmu_gather *tlb;
-	unsigned long nr_accounted = 0;
-
-	lru_add_drain();
-	tlb = tlb_gather_mmu(mm, 0);
-	update_hiwater_rss(mm);
-	unmap_vmas(&tlb, vma, vma->vm_start, vma->vm_end, &nr_accounted, NULL);
-	vm_unacct_memory(nr_accounted);
-	free_pgtables(tlb, vma, vma->vm_start, vma->vm_end);
-	tlb_finish_mmu(tlb, vma->vm_start, vma->vm_end);
-}
-
-/*
- * __do_close: actual close ssmem routine
- * 
- * 1. Unmap the pages.
- * 2. Remove vma from mm
- */
-static void  __do_munmap(struct vm_area_struct *area)
-{
-	struct mm_struct *mm = current->mm;
-	unsigned long addr = area->vm_start;
-
-	if (mm->locked_vm) {
-		mm->locked_vm -= vma_pages(area);
-		munlock_vma_pages_all(area);
-	}
-	
-	mm->unmap_area(mm, addr);
-	mm->mmap_cache = NULL;
-
-	/* get rid of page table information;*/ 
-	__unmap_region(mm, area);
-}
-
 /*
  * ssmem_close
  * callback routine when a process need to close the vma
@@ -298,22 +259,19 @@ static void  __do_munmap(struct vm_area_struct *area)
  *    processes.
  * 2. If it's the last(only) one, do the actual close
  */
+
 static void ssmem_close(struct vm_area_struct *area)
 {
 	struct ssmem_struct *ssmem = area->vm_private_data;
 	struct ssmem_vm *s_vm;
 
-	printk(KERN_ALERT "In ssmem_close\n");
 	if (--ssmem->mappers) {
-		mutex_lock(&ssmem_lock); /* need to protect ssmem_struct */
 		if (SSMEM_MASTER(ssmem) == current->pid) {
 			__assign_master(ssmem);
 		}
 		s_vm = __get_ssmem_vm(area);
 		if (s_vm)
 			list_del(&s_vm->list);
-		mutex_unlock(&ssmem_lock);
-		/*__do_munmap(area);*/
 	} else {
 		__delete_ssmem(ssmem); 
 	}
@@ -411,6 +369,7 @@ static inline struct ssmem_struct * __create_ssmem(int id, size_t length)
 	node->vm_list->vma = NULL;
 	node->vm_list->owner = 0;
 	node->master = current->pid;
+	mutex_init(&node->ssmem_vm_list_lock);
 
 	INIT_LIST_HEAD(&node->vm_list->list);
 
@@ -439,107 +398,12 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 	struct rb_node **rb_link, *rb_parent;
 	struct ssmem_struct *node;
 	struct ssmem_vm *vm_node;
-	struct ssmem_struct *ssmem;
 
+	/* check if id is valid */
 	if (id < 0 || id > SSMEM_MAX-1) {
 		printk(KERN_ALERT "ERROR in ssmem_attach: Invalid id.\n");
 		return -EINVAL;
 	}
-
-	/* check if id exist */
-	if (SSMEM_TEST_ALLOC(id))
-		goto _ATTACH_ROUTINE;
-
-	if (flags & SSMEM_FLAG_CREATE) {
-		if (atomic_read(&ssmem_count) >= SSMEM_MAX) {
-			printk(KERN_ALERT "ERROR in ssmem_attach: Too many ssmem exist.\n");
-			return -EINVAL;
-		}
-
-		if (length == 0) {
-			printk(KERN_ALERT "ERROR in ssmem_attach: Invalid length!\n");
-			return -EINVAL;
-		}
-
-		len = PAGE_ALIGN(len);
-		if (len == 0 || len > TASK_SIZE) {
-			printk(KERN_ALERT "ERROR in ssmem_attach: Invalid length!\n");
-			return -ENOMEM;
-		}
-
-		if (current->mm->map_count > sysctl_max_map_count) {
-			printk(KERN_ALERT "ERROR in ssmem_attach: Too many mappings!\n");
-			return -ENOMEM;
-		}
-
-		vm_flags |= (VM_SHARED|VM_READ);
-
-		if (flags & SSMEM_FLAG_WRITE) {
-			vm_flags |= VM_WRITE;
-		}
-
-		if (flags & SSMEM_FLAG_EXEC) {
-			vm_flags |= VM_EXEC;
-		}
-
-		addr = get_unmapped_area(NULL, 0, len, 0, vm_flags);
-
-		if (addr & ~PAGE_MASK) {
-			printk(KERN_ALERT "ERROR in ssmem_attach: VMA not aligned!");
-			return -EFAULT;
-		}
-
-		for ( ; ; ) {
-			vma = find_vma_prepare(current->mm, addr, &prev, &rb_link, &rb_parent);
-			if (!vma || vma->vm_start >= addr+len)
-				break;
-			/* ssmem_unmap() */
-		}
-
-		vma = kmem_cache_zalloc(vm_area_cachep, GFP_KERNEL);
-		if (!vma) {
-			printk(KERN_ALERT "ERROR in ssmem: kmem_cache_zalloc error!\n");
-			return -ENOMEM;
-		}
-
-		vma->vm_mm = current->mm;
-		vma->vm_start = addr;
-		vma->vm_end = addr + len;
-		vma->vm_flags = vm_flags;
-		vma->vm_page_prot = PAGE_SHARED;
-		vma->vm_ops = &ssmem_vm_ops;
-
-		vma_link(current->mm, vma, prev, rb_link, rb_parent);
-		current->mm->total_vm += len >> PAGE_SHIFT;
-
-		//make_pages_present(addr, addr+len);
-		SSMEM_SET_ALLOC(id); /* set allocation bit to 1 */
-		node = __create_ssmem(id, length);
-		if (!node) {
-			return -ENOMEM;
-		}
-		list_add(&(node->list), ssmem_list_head);
-		
-		vm_node = __create_ssmem_vm(vma);
-		if (!vm_node) {
-			return -ENOMEM;
-		}
-		list_add(&vm_node->list, &node->vm_list->list);
-
-		vma->vm_private_data = node; /* add node(ssmem_struct) to corresponding vma */
-		return addr;
-	}
-
-_ATTACH_ROUTINE:
-	ssmem = __get_ssmem(id);
-
-	if (!ssmem) {
-		/* this should not happen */
-		printk(KERN_ALERT "SOMETHING WRONG!\n");
-		return -EFAULT;
-	}
-
-	len = PAGE_ALIGN(ssmem->length);
 
 	if (atomic_read(&ssmem_count) >= SSMEM_MAX) {
 		printk(KERN_ALERT "ERROR in ssmem_attach: Too many ssmem exist.\n");
@@ -551,8 +415,36 @@ _ATTACH_ROUTINE:
 		return -ENOMEM;
 	}
 
-	vm_flags |= (VM_SHARED|VM_READ);
+	/* If id dosen't exist */
+	if (!SSMEM_TEST_ALLOC(id)) {
+		if (length == 0) {
+			printk(KERN_ALERT "ERROR in ssmem_attach: Invalid length!\n");
+			return -EINVAL;
+		}
 
+		len = PAGE_ALIGN(len);
+		if (len == 0 || len > TASK_SIZE) {
+			printk(KERN_ALERT "ERROR in ssmem_attach: Invalid length!\n");
+			return -ENOMEM;
+		}
+
+		node = __create_ssmem(id, length);
+		if (!node) {
+			return -ENOMEM;
+		}
+		list_add(&(node->list), ssmem_list_head);
+		SSMEM_SET_ALLOC(id); /* set allocation bit to 1 */
+	} else {
+		node = __get_ssmem(id);
+		if (!node) {
+			/* this should not happen */
+			printk(KERN_ALERT "SOMETHING WRONG!\n");
+			return -EFAULT;
+		}
+		len = PAGE_ALIGN(node->length);
+	}
+
+	vm_flags |= (VM_SHARED|VM_READ);
 	if (flags & SSMEM_FLAG_WRITE) {
 		vm_flags |= VM_WRITE;
 	}
@@ -562,17 +454,14 @@ _ATTACH_ROUTINE:
 	}
 
 	addr = get_unmapped_area(NULL, 0, len, 0, vm_flags);
-
 	if (addr & ~PAGE_MASK) {
 		printk(KERN_ALERT "ERROR in ssmem_attach: VMA not aligned!");
 		return -EFAULT;
 	}
-
 	for ( ; ; ) {
 		vma = find_vma_prepare(current->mm, addr, &prev, &rb_link, &rb_parent);
 		if (!vma || vma->vm_start >= addr+len)
 			break;
-		/* ssmem_unmap() */
 	}
 
 	vma = kmem_cache_zalloc(vm_area_cachep, GFP_KERNEL);
@@ -585,17 +474,21 @@ _ATTACH_ROUTINE:
 	vma->vm_start = addr;
 	vma->vm_end = addr + len;
 	vma->vm_flags = vm_flags;
+	vma->vm_page_prot = PAGE_SHARED;
 	vma->vm_ops = &ssmem_vm_ops;
 
+	vma_link(current->mm, vma, prev, rb_link, rb_parent);
+	current->mm->total_vm += len >> PAGE_SHIFT;
+		
 	vm_node = __create_ssmem_vm(vma);
+
 	if (!vm_node) {
 		return -ENOMEM;
 	}
-	list_add(&vm_node->list, &ssmem->vm_list->list);
 
-	vma->vm_private_data = ssmem; /* add node(ssmem_struct) to corresponding vma */
+	list_add(&vm_node->list, &node->vm_list->list);
+	vma->vm_private_data = node;
 	return addr;
-
 }
 
 /*
@@ -607,19 +500,22 @@ _ATTACH_ROUTINE:
  *
  */
 SYSCALL_DEFINE1(ssmem_detach, void *, addr) {
-	struct vm_area_struct *vma, *prev;
+	struct vm_area_struct *vma;
 	struct mm_struct *mm = current->mm;
 	unsigned long start = (unsigned long) addr;
 
 	if (start > TASK_SIZE)
 		return -EFAULT;
 
-	vma = find_vma_prev(mm, start, &prev);
-	if (!vma || !vma->vm_private_data) 
-/* no vma on this address or vma is not a ssmem segment*/
+	vma = find_vma(mm, start);
+	if (!vma || start < vma->vm_start || !vma->vm_private_data) {
+		printk(KERN_ALERT "No ssmem vma on %lu \n", start);
 		return -EFAULT;
+	}
+
 	down_write(&mm->mmap_sem);
 	ssmem_close(vma);
 	up_write(&mm->mmap_sem);
 	return 0;
+
 }
