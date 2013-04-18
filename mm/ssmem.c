@@ -263,7 +263,7 @@ static void ssmem_close(struct vm_area_struct *area)
 {
 	struct ssmem_struct *ssmem = area->vm_private_data;
 	struct ssmem_vm *s_vm;
-
+	mutex_lock(&ssmem->ssmem_vm_list_lock);
 	if (atomic_dec_return(&ssmem->mappers)) {
 		if (SSMEM_MASTER(ssmem) == current->pid) {
 			__assign_master(ssmem);
@@ -276,6 +276,7 @@ static void ssmem_close(struct vm_area_struct *area)
 	} else {
 		__delete_ssmem(ssmem); 
 	}
+	mutex_unlock(&ssmem->ssmem_vm_list_lock);
 }
 
 
@@ -362,7 +363,7 @@ static inline struct ssmem_struct * __create_ssmem(int id, size_t length)
 		printk(KERN_ALERT "ERROR in ssmem_attach: kmalloc error!\n");
 		return NULL;
 	}
-
+	mutex_init(&node->ssmem_vm_list_lock);
 	node->id = id;
 	node->length = length;
 	atomic_set(&node->mappers, 0);
@@ -370,8 +371,6 @@ static inline struct ssmem_struct * __create_ssmem(int id, size_t length)
 	node->vm_list->vma = NULL;
 	node->vm_list->owner = 0;
 	node->master = current->pid;
-	mutex_init(&node->ssmem_vm_list_lock);
-
 	INIT_LIST_HEAD(&node->vm_list->list);
 
 
@@ -433,8 +432,12 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 		if (!node) {
 			return -ENOMEM;
 		}
+
+		mutex_lock(&ssmem_list_lock);
 		list_add(&(node->list), ssmem_list_head);
 		SSMEM_SET_ALLOC(id); /* set allocation bit to 1 */
+		mutex_unlock(&ssmem_list_lock);
+
 	} else {
 		node = __get_ssmem(id);
 		if (!node) {
@@ -486,9 +489,10 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length) {
 	if (!vm_node) {
 		return -ENOMEM;
 	}
-
+	mutex_lock(&node->ssmem_vm_list_lock);
 	list_add(&vm_node->list, &node->vm_list->list);
 	atomic_inc(&node->mappers);
+	mutex_unlock(&node->ssmem_vm_list_lock);
 	vma->vm_private_data = node;
 	return addr;
 }
