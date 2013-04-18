@@ -279,6 +279,76 @@ __delete_ssmem(struct ssmem_struct *ssmem) {
 	mutex_unlock(&ssmem_list_lock);
 }
 
+
+
+/*
+ *__unmap_ssmem_region(struct mm_struct *mm, struct vm_area_struct *vma)
+ *
+ */
+static void
+__unmap_ssmem_region(struct mm_struct *mm, struct vm_area_struct *vma)
+{
+	unsigned long start, end;
+	struct mmu_gather *tlb;
+	unsigned long nr_accounted = 0;
+	
+	start = vma->vm_start;
+	end = vma->vm_end;
+
+	lru_add_drain();
+	tlb = tlb_gather_mmu(mm, 0);
+	update_hiwater_rss(mm);
+	unmap_vmas(&tlb, vma, start, end, &nr_accounted, NULL);
+	vm_unacct_memory(nr_accounted);
+	free_pgtables(tlb, vma, start, end);
+	tlb_finish_mmu(tlb, start, end);
+}
+
+/*
+ * __detach_ssmem_vma_to_be_unmapped
+ *
+ */
+static void
+__detach_ssmem_vma_to_be_unmapped(struct mm_struct *mm,
+				  struct vm_area_struct *vma)
+{
+	unsigned long addr;
+
+	rb_erase(&vma->vm_rb, &mm->mm_rb);
+	mm->map_count--;
+	addr = vma->vm_start;
+	mm->unmap_area(mm, addr);
+	mm->mmap_cache = NULL;
+}
+
+/*
+ * __do_ssmem_munmap
+ *
+ *
+ */
+
+static void __do_ssmem_munmap(struct vm_area_struct *vma)
+{
+	struct mm_struct *mm = vma->vm_mm;
+	long nrpages = vma_pages(vma);
+
+	if (mm->locked_vm && (vma->vm_flags & VM_LOCKED)) {
+		mm->locked_vm -= vma_pages(vma);
+		munlock_vma_pages_all(vma);
+	}
+
+	__detach_ssmem_vma_to_be_unmapped(mm, vma);
+	__unmap_ssmem_region(mm, vma);
+
+	update_hiwater_vm(mm);
+	mm->total_vm -= nrpages;
+	vm_stat_account(mm, vma->vm_flags, vma->vm_file, -nrpages);
+
+	might_sleep();
+	mpol_put(vma_policy(vma));
+	kmem_cache_free(vm_area_cachep, vma);
+}
+
 /*
  * ssmem_close
  * callback routine when a process need to close the vma
@@ -560,6 +630,7 @@ SYSCALL_DEFINE1(ssmem_detach, void *, addr) {
 
 	down_write(&mm->mmap_sem);
 	ssmem_close(vma);
+	__do_ssmem_munmap(vma);
 	up_write(&mm->mmap_sem);
 	return 0;
 
