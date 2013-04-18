@@ -377,7 +377,7 @@ static void ssmem_close(struct vm_area_struct *area)
 		list_del(&s_vm->list);
 		atomic_dec(&ssmem->mappers);
 	}
-	if (atomic_dec_return(&ssmem->mappers)) {
+	if (atomic_read(&ssmem->mappers)) {
 		if (SSMEM_MASTER(ssmem) == current->pid) {
 			__assign_master(ssmem);
 		}
