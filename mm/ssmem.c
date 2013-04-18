@@ -372,14 +372,14 @@ static void ssmem_close(struct vm_area_struct *area)
 	struct ssmem_struct *ssmem = area->vm_private_data;
 	struct ssmem_vm *s_vm;
 	mutex_lock(&ssmem->ssmem_vm_list_lock);
-	s_vm = __get_ssmem_vm(area);
-	if (s_vm) {
-		list_del(&s_vm->list);
-		atomic_dec(&ssmem->mappers);
-	}
-	if (atomic_read(&ssmem->mappers)) {
+
+	if (atomic_dec_return(&ssmem->mappers)) {
 		if (SSMEM_MASTER(ssmem) == current->pid) {
 			__assign_master(ssmem);
+		}
+		s_vm = __get_ssmem_vm(area);
+		if (s_vm) {
+			list_del(&s_vm->list);
 		}
 	} else {
 		printk(KERN_ALERT "PID %d is the last one out\n", current->pid);
