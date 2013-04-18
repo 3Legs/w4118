@@ -365,7 +365,7 @@ static inline struct ssmem_struct * __create_ssmem(int id, size_t length)
 
 	node->id = id;
 	node->length = length;
-	atomic_set(&node->mappers, 1);
+	atomic_set(&node->mappers, 0);
 	node->vm_list = kmalloc(sizeof(struct ssmem_vm), GFP_KERNEL);
 	node->vm_list->vma = NULL;
 	node->vm_list->owner = 0;
