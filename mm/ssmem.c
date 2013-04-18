@@ -313,11 +313,15 @@ __detach_ssmem_vma_to_be_unmapped(struct mm_struct *mm,
 				  struct vm_area_struct *vma)
 {
 	unsigned long addr;
-	struct vm_area_struct *next;
+	struct vm_area_struct *prev, *next;
+	
+	find_vma_prev(mm, vma->vm_start, &prev);
 
 	rb_erase(&vma->vm_rb, &mm->mm_rb);
 	mm->map_count--;
+
 	next = vma->vm_next;
+	prev->vm_next = next;
 	vma->vm_next = NULL;
 
 	addr = next ? next->vm_start : mm->mmap_base;
