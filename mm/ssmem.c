@@ -128,12 +128,12 @@ __ssmem_fault_master(struct vm_area_struct *vma,
 	struct page *page;
 	pte_t *page_table;
 	spinlock_t *ptl;
-deb(1);
-	page = alloc_page(GFP_USER);deb(2);
-	page_table = get_locked_pte(vma->vm_mm, (unsigned long)addr, &ptl);deb(3);
+
+	page = alloc_page(GFP_USER);
+	page_table = get_locked_pte(vma->vm_mm, (unsigned long)addr, &ptl);
 	get_page(page);
-deb(4);
-	set_pte_at(vma->vm_mm, (unsigned long)addr, page_table, mk_pte(page, vma->vm_page_prot));deb(5);
+
+	set_pte_at(vma->vm_mm, (unsigned long)addr, page_table, mk_pte(page, vma->vm_page_prot));
 
 	return 0;
 }
