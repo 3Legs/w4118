@@ -300,7 +300,8 @@ __unmap_ssmem_region(struct mm_struct *mm, struct vm_area_struct *vma)
 	update_hiwater_rss(mm);
 	unmap_vmas(&tlb, vma, start, end, &nr_accounted, NULL);
 	vm_unacct_memory(nr_accounted);
-	/* free_pgtables(tlb, vma, start, end); */
+	free_pgtables(tlb, vma, start, end);
+	deb(1);
 	tlb_finish_mmu(tlb, start, end);
 }
 
@@ -343,8 +344,6 @@ static void __do_ssmem_munmap(struct vm_area_struct *vma)
 	update_hiwater_vm(mm);
 	mm->total_vm -= nrpages;
 	vm_stat_account(mm, vma->vm_flags, vma->vm_file, -nrpages);
-
-	might_sleep();
 	mpol_put(vma_policy(vma));
 	kmem_cache_free(vm_area_cachep, vma);
 }
@@ -628,9 +627,10 @@ SYSCALL_DEFINE1(ssmem_detach, void *, addr) {
 		return -EFAULT;
 	}
 
+	
 	down_write(&mm->mmap_sem);
-	ssmem_close(vma);
 	__do_ssmem_munmap(vma);
+	ssmem_close(vma);
 	up_write(&mm->mmap_sem);
 	return 0;
 
