@@ -301,7 +301,6 @@ __unmap_ssmem_region(struct mm_struct *mm, struct vm_area_struct *vma)
 	unmap_vmas(&tlb, vma, start, end, &nr_accounted, NULL);
 	vm_unacct_memory(nr_accounted);
 	free_pgtables(tlb, vma, start, end);
-	deb(1);
 	tlb_finish_mmu(tlb, start, end);
 }
 
@@ -317,6 +316,7 @@ __detach_ssmem_vma_to_be_unmapped(struct mm_struct *mm,
 
 	rb_erase(&vma->vm_rb, &mm->mm_rb);
 	mm->map_count--;
+	vma->vm_next = NULL;
 	addr = vma->vm_start;
 	mm->unmap_area(mm, addr);
 	mm->mmap_cache = NULL;
