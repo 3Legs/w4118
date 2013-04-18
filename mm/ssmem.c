@@ -51,6 +51,9 @@
 #define SSMEM_FLAG_WRITE    0x2
 #define SSMEM_FLAG_EXEC     0x4
 
+#define SLAVE_CALL					1
+#define MASTER_CALL					0
+
 /* global variable */
 
 static atomic_t ssmem_count = ATOMIC_INIT(0);
@@ -129,7 +132,7 @@ __get_ssmem_vm(struct vm_area_struct *vma)
 
 static int 
 __ssmem_fault_master(struct vm_area_struct *vma,
-	struct ssmem_struct *data, void *addr)
+	struct ssmem_struct *data, void *addr, int caller)
 {
 	struct page *page;
 	pte_t *page_table;
@@ -151,7 +154,11 @@ __ssmem_fault_master(struct vm_area_struct *vma,
 	entry = mk_pte(page, vma->vm_page_prot);
 	if (likely(vma->vm_flags & VM_WRITE))
 		entry = pte_mkwrite(entry);
+
 	get_page(page);
+	if (caller == SLAVE_CALL) {
+		get_page(page);
+	}
 
 	inc_mm_counter(vma->vm_mm, anon_rss);
 	page_add_new_anon_rmap(page, vma, (unsigned long)addr);
@@ -172,7 +179,7 @@ __ssmem_fault_slave(struct vm_area_struct *vma_s, struct vm_area_struct *vma_m,
 	pte_m = get_locked_pte(vma_m->vm_mm, (unsigned long)(vma_m->vm_start + addr - vma_s->vm_start), &ptl_m);
 
 	if (pte_none(*pte_m)) {
-		__ssmem_fault_master(vma_m, data, vma_m->vm_start + addr - vma_s->vm_start);
+		__ssmem_fault_master(vma_m, data, vma_m->vm_start + addr - vma_s->vm_start, SLAVE_CALL);
 	}
 
 	set_pte_at(vma_s->vm_mm, (unsigned long)addr, pte_s, *pte_m);
@@ -189,7 +196,7 @@ static int ssmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	struct ssmem_vm *cur, *next, *master_vm = NULL;
 
 	if (data->master == current->pid) {
-		result = __ssmem_fault_master(vma, data, vmf->virtual_address);
+		result = __ssmem_fault_master(vma, data, vmf->virtual_address, MASTER_CALL);
 	} else {
 		mutex_lock(&data->ssmem_vm_list_lock);
 
