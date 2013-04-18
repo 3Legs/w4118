@@ -241,6 +241,8 @@ __copy_page_table(struct vm_area_struct *source_vma,
 		if (!pte_none(*pte_source)) {
 			pte_target = get_locked_pte(target_vma->vm_mm, target_start + offset, &ptl_target);
 			set_pte_at(target_vma->vm_mm, target_start + offset, pte_target, *pte_source);
+			page = pte_page(*pte_source);
+			get_page(page);
 			pte_unmap_unlock(pte_target, ptl_target);
 		}
 		pte_unmap_unlock(pte_source, ptl_source);
@@ -260,7 +262,6 @@ static void __assign_master(struct ssmem_struct *ssmem)
 	struct ssmem_vm *cur, *next, *master_vm;
 	/* need to lock ssmem list */
 	printk(KERN_ALERT "PID %d is out, need to reassign master\n", current->pid);
-	mutex_lock(&ssmem->ssmem_vm_list_lock);
 
 	list_for_each_entry_safe(cur, next, &ssmem->vm_list->list, list) {
 		if (SSMEM_MASTER(ssmem) == cur->owner) {
@@ -277,7 +278,6 @@ static void __assign_master(struct ssmem_struct *ssmem)
 			break;
 		}
 	}
-	mutex_unlock(&ssmem->ssmem_vm_list_lock);
 }
 
 static inline void
