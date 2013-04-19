@@ -174,9 +174,8 @@ __ssmem_fault_master(struct vm_area_struct *vma,
 		entry = pte_mkwrite(entry);
 
 	get_page(page);
-	if (caller == SLAVE_CALL) {
+	if (caller == SLAVE_CALL)
 		get_page(page);
-	}
 
 	inc_mm_counter(vma->vm_mm, anon_rss);
 	page_add_new_anon_rmap(page, vma, (unsigned long) addr);
@@ -188,7 +187,7 @@ __ssmem_fault_master(struct vm_area_struct *vma,
 
 /*
  *__ssmem_fault_slave
- * 
+ *
  * the slave process routine of page fault handler
  * it will call master routine to ask for a page
  */
@@ -236,7 +235,8 @@ ssmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 					      MASTER_CALL);
 	} else {
 		mutex_lock(&data->ssmem_vm_list_lock);
-		list_for_each_entry_safe(cur, next, &data->vm_list->list, list) {
+		list_for_each_entry_safe(cur, next,
+					&data->vm_list->list, list) {
 			if (SSMEM_MASTER(data) == cur->owner) {
 				master_vm = cur;
 				break;
@@ -247,15 +247,12 @@ ssmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 					     master_vm->vma,
 					     data, vmf->virtual_address);
 	}
-	if (result) {
-		printk("ERROR in ssmem_fault!\n");
-	}
 	return VM_FAULT_NOPAGE;
 }
 
 /*
  * __copy_page_table
- * 
+ *
  * copy one vma's page table entries to another vma
  * It's invoked when we need to re-assign master
  */
@@ -303,7 +300,8 @@ static void
 __assign_master(struct ssmem_struct *ssmem)
 {
 	struct ssmem_vm *cur, *next, *master_vm;
-	list_for_each_entry_safe(cur, next, &ssmem->vm_list->list, list) {
+	list_for_each_entry_safe(cur, next,
+				&ssmem->vm_list->list, list) {
 		if (SSMEM_MASTER(ssmem) == cur->owner) {
 			master_vm = cur;
 			break;
@@ -336,7 +334,7 @@ __delete_ssmem(struct ssmem_struct *ssmem)
 
 /*
  *__unmap_ssmem_region
- * 
+ *
  * unmap a vma from mm
  */
 static void
@@ -427,13 +425,11 @@ ssmem_close(struct vm_area_struct *area)
 	mutex_lock(&ssmem->ssmem_vm_list_lock);
 
 	if (atomic_dec_return(&ssmem->mappers)) {
-		if (SSMEM_MASTER(ssmem) == current->pid) {
+		if (SSMEM_MASTER(ssmem) == current->pid)
 			__assign_master(ssmem);
-		}
 		s_vm = __get_ssmem_vm(area);
-		if (s_vm) {
+		if (s_vm)
 			list_del(&s_vm->list);
-		}
 	} else {
 		printk(KERN_ALERT "PID %d is the last one out\n", current->pid);
 		__delete_ssmem(ssmem);
@@ -520,7 +516,7 @@ __create_ssmem(int id, size_t length)
 {
 	struct ssmem_struct *node;
 
-	node = kmalloc(sizeof (struct ssmem_struct), GFP_KERNEL);
+	node = kmalloc(sizeof(struct ssmem_struct), GFP_KERNEL);
 	if (!node) {
 		printk(KERN_ALERT "ERROR in ssmem_attach: kmalloc error!\n");
 		return NULL;
@@ -543,9 +539,8 @@ __create_ssmem_vm(struct vm_area_struct *vma)
 {
 	struct ssmem_vm *vm_node;
 	vm_node = kmalloc(sizeof (struct ssmem_vm), GFP_KERNEL);
-	if (!vm_node) {
+	if (!vm_node)
 		return NULL;
-	}
 	vm_node->vma = vma;
 	vm_node->owner = current->pid;
 
@@ -602,9 +597,8 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length)
 		}
 
 		node = __create_ssmem(id, length);
-		if (!node) {
+		if (!node)
 			return -ENOMEM;
-		}
 
 		valid_create = 1;
 		mutex_lock(&ssmem_list_lock);
@@ -625,13 +619,11 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length)
 	}
 
 	vm_flags |= (VM_SHARED | VM_READ);
-	if (flags & SSMEM_FLAG_WRITE) {
+	if (flags & SSMEM_FLAG_WRITE)
 		vm_flags |= VM_WRITE;
-	}
 
-	if (flags & SSMEM_FLAG_EXEC) {
+	if (flags & SSMEM_FLAG_EXEC)
 		vm_flags |= VM_EXEC;
-	}
 
 	addr = get_unmapped_area(NULL, 0, len, 0, vm_flags);
 	if (addr & ~PAGE_MASK) {
