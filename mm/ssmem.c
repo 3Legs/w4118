@@ -411,7 +411,7 @@ __do_ssmem_munmap(struct vm_area_struct *vma)
 /*
  * ssmem_close
  * callback routine when a process need to close the vma
- * 
+ *
  * 1. Check whether the current ssmem_struct is shared by
  *    processes.
  * 2. If it's the last(only) one, do the actual close
@@ -525,7 +525,7 @@ __create_ssmem(int id, size_t length)
 	node->id = id;
 	node->length = length;
 	atomic_set(&node->mappers, 0);
-	node->vm_list = kmalloc(sizeof (struct ssmem_vm), GFP_KERNEL);
+	node->vm_list = kmalloc(sizeof(struct ssmem_vm), GFP_KERNEL);
 	node->vm_list->vma = NULL;
 	node->vm_list->owner = 0;
 	node->master = current->pid;
@@ -538,7 +538,7 @@ static inline struct ssmem_vm *
 __create_ssmem_vm(struct vm_area_struct *vma)
 {
 	struct ssmem_vm *vm_node;
-	vm_node = kmalloc(sizeof (struct ssmem_vm), GFP_KERNEL);
+	vm_node = kmalloc(sizeof(struct ssmem_vm), GFP_KERNEL);
 	if (!vm_node)
 		return NULL;
 	vm_node->vma = vma;
@@ -661,9 +661,8 @@ SYSCALL_DEFINE3(ssmem_attach, int, id, int, flags, size_t, length)
 
 	vm_node = __create_ssmem_vm(vma);
 
-	if (!vm_node) {
+	if (!vm_node)
 		return -ENOMEM;
-	}
 	mutex_lock(&node->ssmem_vm_list_lock);
 	list_add(&vm_node->list, &node->vm_list->list);
 	atomic_inc(&node->mappers);
