@@ -163,7 +163,6 @@ __ssmem_fault_master(struct vm_area_struct *vma,
 	inc_mm_counter(vma->vm_mm, anon_rss);
 	page_add_new_anon_rmap(page, vma, (unsigned long)addr);
 	set_pte_at(vma->vm_mm, (unsigned long)addr, page_table, entry);
-	vma->vm_mm->nr_ptes++;
 	pte_unmap_unlock(page_table, ptl);
 
 	return 0;
@@ -184,7 +183,6 @@ __ssmem_fault_slave(struct vm_area_struct *vma_s, struct vm_area_struct *vma_m,
 	}
 
 	set_pte_at(vma_s->vm_mm, (unsigned long)addr, pte_s, *pte_m);
-	vma_s->vm_mm->nr_ptes++;
 	pte_unmap_unlock(pte_m, ptl_m);
 	pte_unmap_unlock(pte_s, ptl_s);
 
@@ -244,7 +242,6 @@ __copy_page_table(struct vm_area_struct *source_vma,
 			pte_target = get_locked_pte(target_vma->vm_mm, target_start + offset, &ptl_target);
 			set_pte_at(target_vma->vm_mm, target_start + offset, pte_target, *pte_source);
 			page = pte_page(*pte_source);
-			target_vma->vm_mm->nr_ptes++;
 			get_page(page);
 			pte_unmap_unlock(pte_target, ptl_target);
 		}
