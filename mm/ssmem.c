@@ -44,7 +44,6 @@
 #define SSMEM_UNSET_ALLOC(id) clear_bit(id, ssmem_alloc)
 
 #define SSMEM_MASTER(ssmem) (ssmem->master)
-#define deb(a) printk(KERN_ALERT "%d\n", a)
 
 #define SSMEM_MAX 1024
 #define SSMEM_FLAG_CREATE   0x1
@@ -54,17 +53,16 @@
 #define SLAVE_CALL					1
 #define MASTER_CALL					0
 
-/* global variable */
-
+/* count of alive ssmem */
 static atomic_t ssmem_count = ATOMIC_INIT(0);
+/* the mutex lock of ssmems */
 DEFINE_MUTEX(ssmem_list_lock);
+/* the bitmap of allocation */
 DECLARE_BITMAP(ssmem_alloc, SSMEM_MAX);
-
-/* structures define */
 
 struct ssmem_vm {
 	struct vm_area_struct *vma;
-	pid_t owner;
+	pid_t owner; /*owner of vma, for faster access*/
 	struct list_head list;
 };
 
@@ -98,11 +96,18 @@ static struct vm_operations_struct ssmem_vm_ops = {
 
 struct list_head *ssmem_list_head = &(ssmem_head.list);
 
-static void ssmem_set_anon(struct ssmem_struct *ssmem, struct anon_vma *anon)
+static inline void ssmem_set_anon(struct ssmem_struct *ssmem, struct anon_vma *anon)
 {
 	ssmem->rmap = anon;
 }
 
+
+/*
+ * __get_ssmem
+ *
+ * get the ssmem_struct from an id
+ *
+ */
 static struct ssmem_struct *
 __get_ssmem(int id)
 {
@@ -114,6 +119,12 @@ __get_ssmem(int id)
 	return NULL;
 }
 
+/*
+ * __get_ssmem_vm
+ *
+ * get the ssmem_vm from a vma
+ *
+ */
 static struct ssmem_vm *
 __get_ssmem_vm(struct vm_area_struct *vma)
 {
@@ -130,6 +141,12 @@ __get_ssmem_vm(struct vm_area_struct *vma)
 	return NULL;
 }
 
+/*
+ * __ssmem_fault_master
+ *
+ * master process routine of page fault handler
+ * all page allocation is through this
+ */
 static int 
 __ssmem_fault_master(struct vm_area_struct *vma,
 	struct ssmem_struct *data, void *addr, int caller)
@@ -150,6 +167,7 @@ __ssmem_fault_master(struct vm_area_struct *vma,
 	page = alloc_page(GFP_USER);
 	if (!page)
 		return VM_FAULT_OOM;
+
 	page_table = get_locked_pte(vma->vm_mm, (unsigned long)addr, &ptl);
 	entry = mk_pte(page, vma->vm_page_prot);
 	if (likely(vma->vm_flags & VM_WRITE))
@@ -168,6 +186,12 @@ __ssmem_fault_master(struct vm_area_struct *vma,
 	return 0;
 }
 
+/*
+ *__ssmem_fault_slave
+ * 
+ * the slave process routine of page fault handler
+ * it will call master routine to ask for a page
+ */
 static int 
 __ssmem_fault_slave(struct vm_area_struct *vma_s, struct vm_area_struct *vma_m,
 	struct ssmem_struct *data, void *addr)
@@ -189,6 +213,11 @@ __ssmem_fault_slave(struct vm_area_struct *vma_s, struct vm_area_struct *vma_m,
 	return 0;
 }
 
+/*
+ * ssmem_fault
+ *
+ * The main routine of the page fault handler
+ */
 static int ssmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	struct ssmem_struct *data = vma->vm_private_data;
@@ -196,22 +225,22 @@ static int ssmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	struct ssmem_vm *cur, *next, *master_vm = NULL;
 
 	if (SSMEM_MASTER(data) == current->pid) {
-		result = __ssmem_fault_master(vma, data, vmf->virtual_address, MASTER_CALL);
+		result = __ssmem_fault_master(vma, data, 
+					vmf->virtual_address,
+					MASTER_CALL);
 	} else {
 		mutex_lock(&data->ssmem_vm_list_lock);
-
 		list_for_each_entry_safe(cur, next, &data->vm_list->list, list) {
 			if (SSMEM_MASTER(data) == cur->owner) {
 				master_vm = cur;
 				break;
 			}
 		}
-
 		mutex_unlock(&data->ssmem_vm_list_lock);
-
-		result = __ssmem_fault_slave(vma, master_vm->vma, data, vmf->virtual_address);
+		result = __ssmem_fault_slave(vma,
+					master_vm->vma, 
+					data, vmf->virtual_address);
 	}
-
 	if (result) {
 		printk("ERROR in ssmem_fault!\n");
 	}
@@ -223,10 +252,11 @@ static int ssmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
  * __copy_page_table
  * 
  * copy one vma's page table entries to another vma
+ * It's invoked when we need to re-assign master
  */
 static void 
 __copy_page_table(struct vm_area_struct *source_vma,
-		  struct vm_area_struct *target_vma)
+		struct vm_area_struct *target_vma)
 {
 	unsigned long source_start = source_vma->vm_start;
 	unsigned long target_start = target_vma->vm_start;
@@ -237,10 +267,20 @@ __copy_page_table(struct vm_area_struct *source_vma,
 	pte_t *pte_source, *pte_target;
 
 	for (offset = 0; offset < len; offset += PAGE_SIZE) {
-		pte_source = get_locked_pte(source_vma->vm_mm, source_start + offset, &ptl_source);
+		pte_source = get_locked_pte(source_vma->vm_mm,
+					source_start + offset,
+					&ptl_source);
+
 		if (!pte_none(*pte_source)) {
-			pte_target = get_locked_pte(target_vma->vm_mm, target_start + offset, &ptl_target);
-			set_pte_at(target_vma->vm_mm, target_start + offset, pte_target, *pte_source);
+			pte_target = get_locked_pte(target_vma->vm_mm,
+						target_start + offset,
+						&ptl_target);
+
+			set_pte_at(target_vma->vm_mm,
+				target_start + offset,
+				pte_target,
+				*pte_source);
+
 			page = pte_page(*pte_source);
 			get_page(page);
 			pte_unmap_unlock(pte_target, ptl_target);
@@ -260,9 +300,6 @@ __copy_page_table(struct vm_area_struct *source_vma,
 static void __assign_master(struct ssmem_struct *ssmem)
 {
 	struct ssmem_vm *cur, *next, *master_vm;
-	/* need to lock ssmem list */
-	printk(KERN_ALERT "PID %d is out, need to reassign master\n", current->pid);
-
 	list_for_each_entry_safe(cur, next, &ssmem->vm_list->list, list) {
 		if (SSMEM_MASTER(ssmem) == cur->owner) {
 			master_vm = cur;
@@ -274,11 +311,15 @@ static void __assign_master(struct ssmem_struct *ssmem)
 		if (SSMEM_MASTER(ssmem) != cur->owner) {
 			__copy_page_table(master_vm->vma, cur->vma);
 			ssmem->master = cur->owner;
-			printk(KERN_ALERT "PID %d is the new master\n", ssmem->master);
 			break;
 		}
 	}
 }
+
+/* __delete_ssmem
+ *
+ * delete a ssmem from list
+ */
 
 static inline void
 __delete_ssmem(struct ssmem_struct *ssmem) {
@@ -292,8 +333,9 @@ __delete_ssmem(struct ssmem_struct *ssmem) {
 
 
 /*
- *__unmap_ssmem_region(struct mm_struct *mm, struct vm_area_struct *vma)
- *
+ *__unmap_ssmem_region
+ * 
+ * unmap a vma from mm
  */
 static void
 __unmap_ssmem_region(struct mm_struct *mm, struct vm_area_struct *vma)
@@ -342,7 +384,6 @@ __detach_ssmem_vma_to_be_unmapped(struct mm_struct *mm,
 
 /*
  * __do_ssmem_munmap
- *
  *
  */
 
