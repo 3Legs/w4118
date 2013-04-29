@@ -428,6 +428,69 @@ static const match_table_t tokens = {
 	{Opt_err, NULL}
 };
 
+static int kget_num(int i)
+{
+	int ret = 1;
+	int p;
+	for (p = 0; p < i; ++p) {
+		ret *= 10;
+	}
+	return ret;
+}
+
+static int kparse_int(char *name)
+{
+	int ret = 0;
+	int i, len;
+	for (i = 0; name[i] != '\0'; ++i) {
+		if (name[i] < 48 || name[i] > 57) {
+			return -1;
+		}
+	}
+
+	len = i;
+
+	for (i = 0; i < len; ++i) {
+		ret += (int)(name[i] - 48) * kget_num(len - i - 1);
+	}
+	return ret;
+}
+
+static int kstrcmp(char *target, char *pattern, int len)
+{
+	int i;
+	for (i = 0; i < len; ++i) {
+		if (target[i] != pattern[i])
+			return -1;
+	}
+	return 0;
+}
+
+static void kget_ip_port(char *p, char **ip, int *port)
+{
+	int len_ip = 0;
+	int len_port = 0;
+	int i;
+	char *ipmem;
+
+	while (p[len_ip] != ':') {
+		++len_ip;
+	}
+
+	while (p[len_ip + 1 + len_port] != '\0') {
+		++len_port;
+	}
+
+	ipmem = kmalloc((len_ip+1) * sizeof(char), GFP_KERNEL);
+	for (i = 0; i < len_ip; ++i) {
+		ipmem[i] = p[i];
+	}
+	ipmem[len_ip] = '\0';
+	*ip = ipmem;
+
+	*port = kparse_int(p + len_ip + 1);
+}
+
 static int parse_options (char * options,
 			  struct ext2_sb_info *sbi)
 {
@@ -442,6 +505,24 @@ static int parse_options (char * options,
 		int token;
 		if (!*p)
 			continue;
+		
+		if (kstrcmp(p, "srv", 3) == 0) {
+			char *ip;
+			int port;
+			kget_ip_port(p+4, &ip, &port);
+			sbi->ip = ip;
+			sbi->port = port;
+			continue;
+		} else if (kstrcmp(p, "wh", 2) == 0) {
+			sbi->water_high = kparse_int(p+3);
+			continue;
+		} else if (kstrcmp(p, "wl", 2) == 0) {
+			sbi->water_low = kparse_int(p+3);
+			continue;
+		} else if (kstrcmp(p, "evict", 5) == 0) {
+			sbi->evict = kparse_int(p+6);
+			continue;
+		}
 
 		token = match_token(p, tokens, args);
 		switch (token) {

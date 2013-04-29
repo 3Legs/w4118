@@ -106,6 +106,13 @@ struct ext2_sb_info {
 	spinlock_t s_rsv_window_lock;
 	struct rb_root s_rsv_window_root;
 	struct ext2_reserve_window_node s_rsv_window_head;
+
+	/* ext2_evict info */
+	char *ip;
+	int port;
+	int water_high;
+	int water_low;
+	int evict;
 };
 
 static inline spinlock_t *
