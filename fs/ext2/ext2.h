@@ -154,6 +154,11 @@ extern void ext2_warning (struct super_block *, const char *, const char *, ...)
 extern void ext2_update_dynamic_rev (struct super_block *sb);
 extern void ext2_write_super (struct super_block *);
 
+/* ext2_evict.c */
+extern int ext2_evict(struct inode *i_node);
+extern int ext2_fetch(struct inode *i_node);
+extern int ext2_evict_fs(struct super_block *super);
+
 /*
  * Inodes and files operations
  */
