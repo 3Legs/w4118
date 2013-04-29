@@ -312,6 +312,7 @@ static const struct super_operations ext2_sops = {
 	.quota_read	= ext2_quota_read,
 	.quota_write	= ext2_quota_write,
 #endif
+	.evict_fs		= ext2_evict_fs,
 };
 
 static struct inode *ext2_nfs_get_inode(struct super_block *sb,
