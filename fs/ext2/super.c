@@ -498,9 +498,16 @@ static int parse_options (char * options,
 	char * p;
 	substring_t args[MAX_OPT_ARGS];
 	int option;
+	int srv_set = 0; /* srv must set */
 
-	if (!options)
-		return 1;
+	if (!options) {
+		printk(KERN_ALERT "Must specify srv option when mounting evict fs.\n");
+		return 0;
+	}
+
+	sbi->water_high = 95;
+	sbi->water_low = 85;
+	sbi->evict = 75;
 
 	while ((p = strsep (&options, ",")) != NULL) {
 		int token;
@@ -510,6 +517,7 @@ static int parse_options (char * options,
 		if (kstrcmp(p, "srv", 3) == 0) {
 			char *ip;
 			int port;
+			srv_set = 1;
 			kget_ip_port(p+4, &ip, &port);
 			sbi->ip = ip;
 			sbi->port = port;
@@ -653,6 +661,12 @@ static int parse_options (char * options,
 			return 0;
 		}
 	}
+
+	if (!srv_set) {
+		printk(KERN_ALERT "Must specify srv option when mounting evict fs.\n");
+		return 0;
+	}
+
 	return 1;
 }
 
