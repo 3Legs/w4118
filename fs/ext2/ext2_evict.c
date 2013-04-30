@@ -32,5 +32,6 @@ int ext2_fetch(struct inode *i_node)
 
 int ext2_evict_fs(struct super_block *super)
 {
+	printk(KERN_ALERT "HELLO\n");
 	return 0;
 }
