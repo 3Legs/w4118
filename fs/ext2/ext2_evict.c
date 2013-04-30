@@ -39,9 +39,9 @@ static int _debug_mode = 1;
 int ext2_evict(struct inode *i_node) {
 	if (_debug_mode) { return 0;}
 	
-	if (atomic_read(i_node->i_count) > 0) {
+	if (atomic_read(&i_node->i_count) > 0) {
 		/* inode has been mapped to a open file */
-		printk(KERN_ALERT "inode %lu has been mapped to a open file", inode->i_ino);
+		printk(KERN_ALERT "inode %lu has been mapped to a open file", i_node->i_ino);
 		return EMFILE;
 	}
 
