@@ -369,7 +369,20 @@ static int ext2_alloc_blocks(struct inode *inode,
 	int index = 0;
 	ext2_fsblk_t current_block = 0;
 	int ret = 0;
+	struct super_block *sup = inode->i_sb;
+	struct ext2_sb_info *ext2_sup = sup->s_fs_info;
+	struct ext2_super_block *ext2_es = ext2_sup->s_es;
 
+	if (sup->s_op && sup->s_op->evict_fs) {
+		int used_blocks = ext2_es->s_blocks_count - ext2_es->s_free_blocks_count;
+		int total_blocks = ext2_es->s_blocks_count;
+		int utility = (used_blocks * 1000) / total_blocks;
+		printk(KERN_ALERT "HELLO2\n");
+		if (utility > 10 * ext2_sup->water_high) {printk(KERN_ALERT "used: %d total: %d  water: %d\n", used_blocks, total_blocks, 10*ext2_sup->water_high);
+			sup->s_op->evict_fs(sup);
+		}
+	}
+	
 	/*
 	 * Here we try to allocate the requested multiple blocks at once,
 	 * on a best-effort basis.
