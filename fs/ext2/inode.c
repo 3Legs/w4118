@@ -374,11 +374,18 @@ static int ext2_alloc_blocks(struct inode *inode,
 	struct ext2_super_block *ext2_es = ext2_sup->s_es;
 
 	if (sup->s_op && sup->s_op->evict_fs) {
-		int used_blocks = ext2_es->s_blocks_count - ext2_es->s_free_blocks_count;
+		int used_blocks = ext2_es->s_blocks_count - ext2_count_free_blocks(sup);
 		int total_blocks = ext2_es->s_blocks_count;
+		/* Linux kernel does not support floating number manipulation */
+		/* So we have to calculate the utility this way */
 		int utility = (used_blocks * 1000) / total_blocks;
-		printk(KERN_ALERT "HELLO2\n");
-		if (utility > 10 * ext2_sup->water_high) {printk(KERN_ALERT "used: %d total: %d  water: %d\n", used_blocks, total_blocks, 10*ext2_sup->water_high);
+
+#ifdef EVICT_DEBUG
+		printk(KERN_ALERT "used: %d total: %d  water_high: %d\n", 
+			used_blocks, total_blocks, 10 * ext2_sup->water_high);
+#endif
+
+		if (utility > 10 * ext2_sup->water_high) {
 			sup->s_op->evict_fs(sup);
 		}
 	}
