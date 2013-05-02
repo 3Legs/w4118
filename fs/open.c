@@ -29,6 +29,8 @@
 #include <linux/rcupdate.h>
 #include <linux/audit.h>
 #include <linux/falloc.h>
+#include "./ext2/ext2.h"
+#include "./ext2/xattr.h"
 
 struct evicted {
 	long evicted;
