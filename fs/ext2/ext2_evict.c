@@ -42,6 +42,10 @@ struct clock_hand {
 	long hand;
 };
 
+struct evicted {
+	long evicted;
+};
+
 int ext2_evict(struct inode *i_node) {
 	if (_debug_mode) { return 0;}
 	
@@ -87,6 +91,7 @@ int ext2_evict_fs(struct super_block *super)
 	struct timespec *set_time;
 	struct timespec *current_time = kmalloc(sizeof(struct timespec), GFP_KERNEL);
 	struct clock_hand *clockhand = kmalloc(sizeof(struct clock_hand), GFP_KERNEL);
+	struct evicted *set_evicted;
 	int used_blocks = ext2_es->s_blocks_count - ext2_count_free_blocks(super);
 	int total_blocks = ext2_es->s_blocks_count;
 	int utility = (used_blocks * 1000) / total_blocks;
@@ -163,7 +168,13 @@ int ext2_evict_fs(struct super_block *super)
 
 		if (time_greater(scan_time, &node->i_atime)) {
 			printk(KERN_ALERT "Calling ext2_evict.\n");
-			ext2_evict(node);
+			res = ext2_evict(node);
+			set_evicted = kmalloc(sizeof(struct evicted), GFP_KERNEL);
+			res = ext2_xattr_set(node, EXT2_XATTR_INDEX_TRUSTED, "evicted", set_evicted, sizeof(struct evicted), 0);
+			if (res < 0) {
+				printk(KERN_ALERT "Error in ext2_xattr_set.\n");
+				return -1;
+			}
 			used_blocks = ext2_es->s_blocks_count - ext2_count_free_blocks(super);
 			utility = (used_blocks * 1000) / total_blocks;
 
