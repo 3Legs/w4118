@@ -30,6 +30,10 @@
 #include <linux/audit.h>
 #include <linux/falloc.h>
 
+struct evicted {
+	long evicted;
+};
+
 int vfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 {
 	int retval = -ENODEV;
@@ -1171,6 +1175,26 @@ SYSCALL_DEFINE0(vhangup)
  */
 int generic_file_open(struct inode * inode, struct file * filp)
 {
+	int res;
+	int val;
+	struct evicted *evicted = kmalloc(sizeof(struct evicted), GFP_KERNEL);
+	res = ext2_xattr_get(inode, EXT2_XATTR_INDEX_TRUSTED, "evicted", evicted, sizeof(struct evicted));
+	if (res < 0) {
+		evicted->evicted = 0;
+		val = 0;
+		res = ext2_xattr_set(inode, EXT2_XATTR_INDEX_TRUSTED, "evicted", evicted, sizeof(struct evicted), XATTR_CREATE);
+		if (res < 0) {
+			printk(KERN_ALERT "Error in ext2_xattr_set create. In generic_file_open.\n");
+			return -1;
+		}
+	} else {
+		val = evicted->evicted;
+	}
+
+	if (val) {
+		res = ext2_fetch(inode);
+	}
+	
 	if (!(filp->f_flags & O_LARGEFILE) && i_size_read(inode) > MAX_NON_LFS)
 		return -EOVERFLOW;
 	return 0;
