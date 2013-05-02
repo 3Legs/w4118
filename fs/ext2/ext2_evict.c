@@ -15,34 +15,52 @@
 #include <linux/log2.h>
 #include <linux/quotaops.h>
 #include <asm/uaccess.h>
+
+#include <linux/net.h>
+#include <net/sock.h>
+#include <linux/tcp.h>
+#include <linux/in.h>
+#include <linux/file.h>
+#include <linux/socket.h>
+#include <linux/smp_lock.h>
+
 #include "ext2.h"
 #include "xattr.h"
 #include "acl.h"
 #include "xip.h"
 
-#define SERVER_IP "10.0.2.2"
-#define EVICT_PORT 8888
 #define d(x) printk(KERN_ALERT "%d\n", x)
 
+#ifndef EVICT_DEBUG
+#define EVICT_DEBUG 0
+#if EVICT_DEBUG
 static int _debug_mode = 1;
-
-/* Evict the file identified by i_node to the cloud server,
-* freeing its disk blocks and removing any page cache pages.
-* The call should return when the file is evicted. Besides
-* the file data pointers, no other metadata, e.g., access time,
-* size, etc. should be changed. Appropriate errors should
-* be returned. In particular, the operation should fail if the
-* inode currently maps to an open file. Lock the inode
-* appropriately to prevent a file open operation on it while
-* it is being evicted.
-*/ 
+#else
+static int _debug_mode = 0;
+#endif
+#endif
 
 /* define structures */
 struct clock_hand {
 	long hand;
 };
 
+static unsigned int inet_addr(char *str)
+{
+	int a,b,c,d;
+	char arr[4];
+	sscanf(str,"%d.%d.%d.%d",&a,&b,&c,&d);
+	arr[0] = a; arr[1] = b; arr[2] = c; arr[3] = d;
+	return *(unsigned int*)arr;
+} 
+
 int ext2_evict(struct inode *i_node) {
+
+	struct sockaddr_in server_addr;
+	struct socket *socket;
+	unsigned long buflen;
+	int r = -1;
+
 	if (_debug_mode) { return 0;}
 	
 	if (atomic_read(&i_node->i_count) > 0) {
@@ -50,8 +68,17 @@ int ext2_evict(struct inode *i_node) {
 		printk(KERN_ALERT "inode %lu has been mapped to a open file", i_node->i_ino);
 		return EMFILE;
 	}
+	
+	r = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &socket);
+	memset(&server_addr, 0, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_port = ((struct ext2_sb_info *)i_node->i_sb->s_fs_info)->port;
+	server_addr.sin_addr.s_addr = inet_addr(((struct ext2_sb_info *)i_node->i_sb->s_fs_info)->ip);
 
-	 
+	r = socket->ops->connect(socket, 
+				 (struct sockaddr *) &server_addr,
+				 sizeof(server_addr), O_RDWR);
+	printk(KERN_ALERT "result: %d\n", r);
 	return 0;
 }
 
