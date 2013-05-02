@@ -127,6 +127,13 @@ int ext2_evict_fs(struct super_block *super)
 	long current_inode;
 	int res;
 
+	printk(KERN_ALERT "Calling ext2_evict_fs.\n");
+
+	if (utility < 10 * ext2_sup->water_low) {
+		printk(KERN_ALERT "In ext2_evict_fs: no need to evict.\n");
+		return 0;
+	}
+
 	mutex_lock(&root_inode->i_mutex);
 	res = ext2_xattr_get(root_inode, EXT2_XATTR_INDEX_TRUSTED, "clockhand", clockhand, sizeof(struct clock_hand));
 	if (res < 0) {
@@ -148,6 +155,7 @@ int ext2_evict_fs(struct super_block *super)
 
 	while (1) {
 		node = ext2_iget(super, current_inode);
+		/*printk(KERN_ALERT "current_inode: %d %d %p\n", node->i_ino, node->i_count, node);*/
 		if ((void *)node == (void *)(-ESTALE)) {
 			++current_inode;
 
@@ -157,7 +165,7 @@ int ext2_evict_fs(struct super_block *super)
 		}
 		mutex_lock(&node->i_mutex);
 		
-		if (!S_ISREG(node->i_mode) || atomic_read(&node->i_count) > 0) {
+		if (!S_ISREG(node->i_mode) /*|| atomic_read(&node->i_count) > 0*/) {d(411111);
 			++current_inode;
 
 			if (current_inode > max_inode_number)
@@ -197,6 +205,7 @@ int ext2_evict_fs(struct super_block *super)
 			printk(KERN_ALERT "Calling ext2_evict.\n");
 			res = ext2_evict(node);
 			set_evicted = kmalloc(sizeof(struct evicted), GFP_KERNEL);
+			set_evicted->evicted = 1;
 			res = ext2_xattr_set(node, EXT2_XATTR_INDEX_TRUSTED, "evicted", set_evicted, sizeof(struct evicted), 0);
 			if (res < 0) {
 				printk(KERN_ALERT "Error in ext2_xattr_set.\n");

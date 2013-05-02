@@ -41,6 +41,8 @@ MODULE_AUTHOR("Remy Card and others");
 MODULE_DESCRIPTION("Second Extended Filesystem");
 MODULE_LICENSE("GPL");
 
+#define d(x) printk(KERN_ALERT "%d\n", x)
+
 static int ext2_update_inode(struct inode * inode, int do_sync);
 
 /*
@@ -379,7 +381,7 @@ static int ext2_alloc_blocks(struct inode *inode,
 		/* Linux kernel does not support floating number manipulation */
 		/* So we have to calculate the utility this way */
 		int utility = (used_blocks * 1000) / total_blocks;
-
+#define EVICT_DEBUG
 #ifdef EVICT_DEBUG
 		printk(KERN_ALERT "used: %d total: %d  water_high: %d\n", 
 			used_blocks, total_blocks, 10 * ext2_sup->water_high);
