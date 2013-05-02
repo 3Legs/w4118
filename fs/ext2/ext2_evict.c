@@ -31,16 +31,32 @@
 
 #define d(x) printk(KERN_ALERT "%d\n", x)
 
-#ifndef EVICT_DEBUG
 #define EVICT_DEBUG 0
 #if EVICT_DEBUG
 static int _debug_mode = 1;
 #else
 static int _debug_mode = 0;
 #endif
-#endif
 
-/* define structures */
+enum clfs_status {
+	CLFS_OK = 0,            /* Success */
+	CLFS_INVAL = EINVAL,    /* Invalid address */
+	CLFS_ACCESS = EACCES,   /* Could not read/write file */
+	CLFS_ERROR              /* Other errors */
+};
+
+enum clfs_type {
+	CLFS_PUT,
+	CLFS_GET,
+	CLFS_RM
+};
+
+struct clfs_req {
+	enum clfs_type type;
+	unsigned long inode;
+	unsigned long size;
+};
+
 struct clock_hand {
 	long hand;
 };
@@ -56,34 +72,68 @@ static unsigned int inet_addr(char *str)
 	sscanf(str,"%d.%d.%d.%d",&a,&b,&c,&d);
 	arr[0] = a; arr[1] = b; arr[2] = c; arr[3] = d;
 	return *(unsigned int*)arr;
-} 
+}
 
-int ext2_evict(struct inode *i_node) {
-
+static int __connect_socket(struct socket *socket, struct inode* i) {
 	struct sockaddr_in server_addr;
-	struct socket *socket;
-	unsigned long buflen;
-	int r = -1;
+	int r;
 
-	if (_debug_mode) { return 0;}
-	
-	if (atomic_read(&i_node->i_count) > 0) {
-		/* inode has been mapped to a open file */
-		printk(KERN_ALERT "inode %lu has been mapped to a open file", i_node->i_ino);
-		return EMFILE;
-	}
-	
-	r = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &socket);
 	memset(&server_addr, 0, sizeof(server_addr));
 	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = ((struct ext2_sb_info *)i_node->i_sb->s_fs_info)->port;
-	server_addr.sin_addr.s_addr = inet_addr(((struct ext2_sb_info *)i_node->i_sb->s_fs_info)->ip);
+	server_addr.sin_port = ((struct ext2_sb_info *)i->i_sb->s_fs_info)->port;
+	server_addr.sin_addr.s_addr = inet_addr(((struct ext2_sb_info *)i->i_sb->s_fs_info)->ip);
 
 	r = socket->ops->connect(socket, 
 				 (struct sockaddr *) &server_addr,
-				 sizeof(server_addr), O_RDWR);
-	printk(KERN_ALERT "result: %d\n", r);
-	return 0;
+				 sizeof(server_addr), O_RDWR);	
+	return r;
+}
+
+static int __send_request(struct socket *socket, struct inode *i_node, enum clfs_type type) {
+	int r = 0;
+	struct clfs_req *req;
+	
+	req = kmalloc(sizeof(struct clfs_req), GFP_KERNEL);
+	req->type = type;
+	req->inode = i_node->i_ino;
+	req->size = sizeof(struct clfs_req);
+
+	return r;
+	
+}
+
+static int __read_response(struct socket *socket) {
+	int response = 0;
+
+	return response;
+}
+
+static void __send_file_data(struct socket *socket, struct inode *i_node) {
+}
+
+int ext2_evict(struct inode *i_node) {
+
+	struct socket *socket;
+	int r = -1;
+	
+	r = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &socket);
+
+
+	r = __connect_socket(socket, i_node);
+	if (!r) {
+		printk(KERN_ALERT "Socket create error: %d\n", r);
+		goto evict_out;
+	}
+
+	__send_request(socket, i_node, CLFS_PUT);
+	r = __read_response(socket);
+	if (r == CLFS_OK) {
+		__send_file_data(socket, i_node);
+		r = __read_response(socket);
+	}
+
+evict_out:	
+	return r;
 }
 
 int ext2_fetch(struct inode *i_node)
