@@ -31,13 +31,6 @@
 
 #define d(x) printk(KERN_ALERT "%d\n", x)
 
-#define EVICT_DEBUG 0
-#if EVICT_DEBUG
-static int _debug_mode = 1;
-#else
-static int _debug_mode = 0;
-#endif
-
 enum clfs_status {
 	CLFS_OK = 0,            /* Success */
 	CLFS_INVAL = EINVAL,    /* Invalid address */
@@ -126,6 +119,30 @@ static void __send_request(struct socket *socket,
 	set_fs(oldmm);
 }
 
+static void __send_response(struct socket *socket, enum clfs_status res) {
+	int response = (int)res;
+	struct msghdr hdr;
+	struct iovec *iov;
+	mm_segment_t oldmm;
+
+	iov = kmalloc(sizeof(struct iovec), GFP_KERNEL);
+	iov->iov_base = &response;
+	iov->iov_len = sizeof(int);
+	
+	hdr.msg_name = 0;
+	hdr.msg_namelen = 0;
+	hdr.msg_control = NULL;
+	hdr.msg_controllen = 0;
+	hdr.msg_flags = MSG_DONTWAIT;
+	hdr.msg_iov = iov;
+	hdr.msg_iovlen  = 1;
+	
+	oldmm = get_fs(); 
+	set_fs(KERNEL_DS);
+	sock_sendmsg(socket, &hdr, sizeof(int));
+	set_fs(oldmm);
+}
+
 static int __read_response(struct socket *socket) {
 	int response = 0;
 	struct msghdr hdr;
@@ -153,6 +170,10 @@ static int __read_response(struct socket *socket) {
 static void __send_file_data(struct socket *socket, struct inode *i_node) {
 }
 
+static int __read_file_data(struct socket *socket, struct inode *i_node) {
+	return 0;
+}
+
 int ext2_evict(struct inode *i_node) {
 	struct sockaddr_in *server_addr = NULL;
 	struct socket *socket;
@@ -172,17 +193,39 @@ int ext2_evict(struct inode *i_node) {
 	if (r == CLFS_OK) {
 		__send_file_data(socket, i_node);
 		r = __read_response(socket);
+		if (r == CLFS_OK) {
+			/* clean up local file here */
+		}
 	}
-
-evict_out:	
+	sock_release(socket);
+evict_out:
 	return r;
 }
 
 int ext2_fetch(struct inode *i_node)
 {
-	if (_debug_mode) { return 0;}
+	struct sockaddr_in *server_addr = NULL;
+	struct socket *socket;
+	int r = -1;
+	
+	r = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &socket);
+	memset(server_addr, 0, sizeof(struct sockaddr_in));
+	__prepare_addr(server_addr, i_node);
+	r = __connect_socket(socket, server_addr, i_node);
+	if (!r) {
+		printk(KERN_ALERT "Socket create error: %d\n", r);
+		goto evict_out;
+	}
 
-	return 0;
+	__send_request(socket, server_addr, i_node, CLFS_GET);
+	r = __read_response(socket);
+	if (r == CLFS_OK) {
+		r = __read_file_data(socket, i_node);
+		__send_response(socket, (enum clfs_status) r);
+	}
+	sock_release(socket);
+evict_out:
+	return r;
 }
 
 static int time_greater(struct timespec *t1, struct timespec *t2)
