@@ -29,7 +29,6 @@ static int evict_daemon(void *data)
 	while (1) {
 		p = get_fs_type("ext2");
 		if (p) {
-			spin_lock(&sb_lock);
 			list_for_each_entry(sup, &p->fs_supers, s_instances) {
 				mutex_lock(&sup->s_lock);
 				if (sup->s_op && sup->s_op->evict_fs) {
@@ -37,7 +36,6 @@ static int evict_daemon(void *data)
 				}
 				mutex_unlock(&sup->s_lock);
 			}
-			spin_unlock(&sb_lock);
 
 			msleep(SECONDS_PER_MINUTE * 1000);
 		} else {
