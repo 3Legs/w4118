@@ -667,6 +667,11 @@ static int parse_options (char * options,
 		return 0;
 	}
 
+	if (sbi->water_low >= sbi->water_high || sbi->evict >= sbi->water_low) {
+		printk(KERN_ALERT "Invalid values of wh,wl,evict.\n");
+		return 0;
+	}
+
 	return 1;
 }
 
