@@ -130,7 +130,7 @@ int ext2_evict_fs(struct super_block *super)
 		}
 		mutex_lock(&node->i_mutex);
 		
-		if (!S_ISREG(node->i_mode) || atomic_read(&node->i_count) <= 0) {
+		if (!S_ISREG(node->i_mode) || atomic_read(&node->i_count) > 0) {
 			++current_inode;
 
 			if (current_inode > max_inode_number)
