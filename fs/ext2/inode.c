@@ -381,7 +381,7 @@ static int ext2_alloc_blocks(struct inode *inode,
 		/* Linux kernel does not support floating number manipulation */
 		/* So we have to calculate the utility this way */
 		int utility = (used_blocks * 1000) / total_blocks;
-#define EVICT_DEBUG
+
 #ifdef EVICT_DEBUG
 		printk(KERN_ALERT "used: %d total: %d  water_high: %d\n", 
 			used_blocks, total_blocks, 10 * ext2_sup->water_high);

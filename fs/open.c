@@ -1180,6 +1180,7 @@ int generic_file_open(struct inode * inode, struct file * filp)
 	int res;
 	int val;
 	struct evicted *evicted = kmalloc(sizeof(struct evicted), GFP_KERNEL);
+	printk(KERN_ALERT "Inode %d will be opened.\n", inode->i_ino);
 	res = ext2_xattr_get(inode, EXT2_XATTR_INDEX_TRUSTED, "evicted", evicted, sizeof(struct evicted));
 	if (res < 0) {
 		evicted->evicted = 0;

@@ -49,6 +49,8 @@ struct evicted {
 	long evicted;
 };
 
+DEFINE_SPINLOCK(wc_check_lock);
+
 static unsigned int inet_addr(char *str)
 {
 	int a,b,c,d;
@@ -107,6 +109,19 @@ static int time_greater(struct timespec *t1, struct timespec *t2)
 	return 0;
 }
 
+static struct inode *evict_ext2_iget(struct super_block *super, long ino)
+{
+	struct inode *inode = ext2_iget(super, ino);
+
+	if ((void *)inode == (void *)(-ESTALE))
+		return inode;
+
+	if (atomic_read(&inode->i_writecount) == 0)
+		return inode;
+
+	return NULL;
+}
+
 int ext2_evict_fs(struct super_block *super)
 {
 	struct dentry *ext2_root = super->s_root;
@@ -154,9 +169,9 @@ int ext2_evict_fs(struct super_block *super)
 	}
 
 	while (1) {
-		node = ext2_iget(super, current_inode);
+		node = evict_ext2_iget(super, current_inode);
 		/*printk(KERN_ALERT "current_inode: %d %d %p\n", node->i_ino, node->i_count, node);*/
-		if ((void *)node == (void *)(-ESTALE)) {
+		if ((void *)node == (void *)(-ESTALE) || node == NULL) {
 			++current_inode;
 
 			if (current_inode > max_inode_number)
@@ -165,7 +180,7 @@ int ext2_evict_fs(struct super_block *super)
 		}
 		mutex_lock(&node->i_mutex);
 		
-		if (!S_ISREG(node->i_mode) /*|| atomic_read(&node->i_count) > 0*/) {d(411111);
+		if (!S_ISREG(node->i_mode) || atomic_read(&node->i_writecount) > 0) {
 			++current_inode;
 
 			if (current_inode > max_inode_number)
@@ -202,7 +217,7 @@ int ext2_evict_fs(struct super_block *super)
 		}
 
 		if (time_greater(scan_time, &node->i_atime)) {
-			printk(KERN_ALERT "Calling ext2_evict.\n");
+			printk(KERN_ALERT "Calling ext2_evict, i_ino: %lu, i_writecount: %d\n", node->i_ino, atomic_read(&node->i_writecount));
 			res = ext2_evict(node);
 			set_evicted = kmalloc(sizeof(struct evicted), GFP_KERNEL);
 			set_evicted->evicted = 1;
