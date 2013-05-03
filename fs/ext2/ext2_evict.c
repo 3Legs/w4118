@@ -75,7 +75,7 @@ static inline void __prepare_addr(struct sockaddr_in *addr, struct inode*i) {
 	addr->sin_port = htons(((struct ext2_sb_info *)i->i_sb->s_fs_info)->port);
 	addr->sin_addr.s_addr = htonl(inet_addr(((struct ext2_sb_info *)i->i_sb->s_fs_info)->ip));
 
-	printk(KERN_ALERT "IP: %s, port: %d\n", ((struct ext2_sb_info *)i->i_sb->s_fs_info)->ip, addr->sin_port);
+	printk(KERN_ALERT "IP: %s, port: %d\n", ((struct ext2_sb_info *)i->i_sb->s_fs_info)->ip, ntohs(addr->sin_port));
 
 }
 
@@ -109,18 +109,18 @@ static void __send_request(struct socket *socket,
 	iov->iov_base = req;
 	iov->iov_len = sizeof(struct clfs_req);
 	
-	hdr.msg_name = addr;
-	hdr.msg_namelen = sizeof(struct sockaddr);
+	hdr.msg_name = NULL;
+	hdr.msg_namelen = 0;
 	hdr.msg_control = NULL;
 	hdr.msg_controllen = 0;
 	hdr.msg_flags = MSG_DONTWAIT;
 	hdr.msg_iov = iov;
 	hdr.msg_iovlen  = 1;
 	
-	oldmm = get_fs(); 
-	set_fs(KERNEL_DS);
+	/* oldmm = get_fs();  */
+	/* set_fs(KERNEL_DS); */
 	sock_sendmsg(socket, &hdr, sizeof(struct clfs_req));
-	set_fs(oldmm);
+	/* set_fs(oldmm); */
 }
 
 static void __send_response(struct socket *socket, enum clfs_status res) {
@@ -204,7 +204,7 @@ int ext2_evict(struct inode *i_node) {
 		printk(KERN_ALERT "Socket connect error: %d\n", r);
 		goto evict_release_out;
 	}
-
+	printk(KERN_ALERT "Socket connected, about to send request\n");
 	__send_request(socket, server_addr, i_node, CLFS_PUT);
 	printk(KERN_ALERT "Request sent, about to read response\n");
 
