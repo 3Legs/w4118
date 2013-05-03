@@ -18,6 +18,8 @@
 #include <linux/delay.h>
 #include <asm/uaccess.h>
 
+#include "./ext2/ext2.h"
+
 /* define macros */
 #define SECONDS_PER_MINUTE 60
 
