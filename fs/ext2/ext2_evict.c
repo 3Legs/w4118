@@ -73,7 +73,7 @@ static inline void __prepare_addr(struct sockaddr_in *addr, struct inode*i) {
 
 	addr->sin_family = AF_INET;
 	addr->sin_port = htons(((struct ext2_sb_info *)i->i_sb->s_fs_info)->port);
-	addr->sin_addr.s_addr = htonl(inet_addr(((struct ext2_sb_info *)i->i_sb->s_fs_info)->ip));
+	addr->sin_addr.s_addr = inet_addr(((struct ext2_sb_info *)i->i_sb->s_fs_info)->ip);
 
 	printk(KERN_ALERT "IP: %s, port: %d\n", ((struct ext2_sb_info *)i->i_sb->s_fs_info)->ip, ntohs(addr->sin_port));
 
