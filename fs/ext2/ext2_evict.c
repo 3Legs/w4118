@@ -70,6 +70,21 @@ static unsigned int inet_addr(char *str)
 	return *(unsigned int*)arr;
 }
 
+static inline void __prepare_msghdr(struct msghdr *hdr, struct iovec * iov, void *data, size_t len) {
+	
+	iov = kmalloc(sizeof(struct iovec), GFP_KERNEL);
+	iov->iov_base = data;
+	iov->iov_len = len;
+	
+	hdr->msg_name = NULL;
+	hdr->msg_namelen = 0;
+	hdr->msg_control = NULL;
+	hdr->msg_controllen = 0;
+	hdr->msg_flags = MSG_DONTWAIT;
+	hdr->msg_iov = iov;
+	hdr->msg_iovlen  = 1;
+}
+
 static inline void __prepare_addr(struct sockaddr_in *addr, struct inode*i) {
 
 	addr->sin_family = AF_INET;
@@ -98,7 +113,7 @@ static void __send_request(struct socket *socket,
 {
 	struct clfs_req *req;
 	struct msghdr hdr;
-	struct iovec *iov;
+	struct iovec iov;
 	mm_segment_t oldmm;
 
 	req = kmalloc(sizeof(struct clfs_req), GFP_KERNEL);
@@ -106,18 +121,7 @@ static void __send_request(struct socket *socket,
 	req->inode = i_node->i_ino;
 	req->size = 0;
 	
-	iov = kmalloc(sizeof(struct iovec), GFP_KERNEL);
-	iov->iov_base = req;
-	iov->iov_len = sizeof(struct clfs_req);
-	
-	hdr.msg_name = NULL;
-	hdr.msg_namelen = 0;
-	hdr.msg_control = NULL;
-	hdr.msg_controllen = 0;
-	hdr.msg_flags = MSG_DONTWAIT;
-	hdr.msg_iov = iov;
-	hdr.msg_iovlen  = 1;
-	
+	__prepare_msghdr(&hdr, &iov, (void *) req, sizeof(struct clfs_req));
 	oldmm = get_fs();
 	set_fs(KERNEL_DS);
 	sock_sendmsg(socket, &hdr, sizeof(struct clfs_req));
@@ -127,21 +131,10 @@ static void __send_request(struct socket *socket,
 static void __send_response(struct socket *socket, enum clfs_status res) {
 	int response = (int)res;
 	struct msghdr hdr;
-	struct iovec *iov;
+	struct iovec iov;
 	mm_segment_t oldmm;
 
-	iov = kmalloc(sizeof(struct iovec), GFP_KERNEL);
-	iov->iov_base = &response;
-	iov->iov_len = sizeof(int);
-	
-	hdr.msg_name = 0;
-	hdr.msg_namelen = 0;
-	hdr.msg_control = NULL;
-	hdr.msg_controllen = 0;
-	hdr.msg_flags = MSG_DONTWAIT;
-	hdr.msg_iov = iov;
-	hdr.msg_iovlen  = 1;
-	
+	__prepare_msghdr(&hdr, &iov, (void *) &response, sizeof(int));
 	oldmm = get_fs(); 
 	set_fs(KERNEL_DS);
 	sock_sendmsg(socket, &hdr, sizeof(int));
@@ -151,20 +144,10 @@ static void __send_response(struct socket *socket, enum clfs_status res) {
 static int __read_response(struct socket *socket) {
 	int response = 0;
 	struct msghdr hdr;
-	struct iovec *iov;
+	struct iovec iov;
 	int len;
 
-	iov = kmalloc(sizeof(int), GFP_KERNEL);
-	iov->iov_base = &response;
-	iov->iov_len = sizeof(int);
-	
-	hdr.msg_name = NULL;
-	hdr.msg_namelen = 0;
-	hdr.msg_control = NULL;
-	hdr.msg_controllen = 0;
-	hdr.msg_flags = MSG_DONTWAIT;
-	hdr.msg_iov = iov;
-	hdr.msg_iovlen  = 1;
+	__prepare_msghdr(&hdr, &iov, (void *) &response, sizeof(int));
 	
 	len = sock_recvmsg(socket, &hdr, sizeof(int), 0);
 	if (len)
@@ -172,7 +155,15 @@ static int __read_response(struct socket *socket) {
 	return CLFS_ERROR;
 }
 
+/*
+ * send file data through socket
+ * 1. get the hash code of file data for future authentication
+ * 2. encrypt data for safety
+ * 3. send
+ * 4. handle local data (delete page cache and reclaim blocks)
+ */
 static void __send_file_data(struct socket *socket, struct inode *i_node) {
+	
 }
 
 static int __read_file_data(struct socket *socket, struct inode *i_node) {
