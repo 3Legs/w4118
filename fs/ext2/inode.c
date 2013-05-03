@@ -41,6 +41,8 @@ MODULE_AUTHOR("Remy Card and others");
 MODULE_DESCRIPTION("Second Extended Filesystem");
 MODULE_LICENSE("GPL");
 
+#define d(x) printk(KERN_ALERT "%d\n", x)
+
 static int ext2_update_inode(struct inode * inode, int do_sync);
 
 /*
