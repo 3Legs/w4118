@@ -388,7 +388,9 @@ static int ext2_alloc_blocks(struct inode *inode,
 #endif
 
 		if (utility > 10 * ext2_sup->water_high) {
+			evict_mutex_lock();
 			sup->s_op->evict_fs(sup);
+			evict_mutex_unlock();
 		}
 	}
 	

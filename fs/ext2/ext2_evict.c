@@ -59,6 +59,7 @@ struct evicted {
 };
 
 DEFINE_SPINLOCK(wc_check_lock);
+DEFINE_MUTEX(evict_mutex);
 
 static unsigned int inet_addr(char *str)
 {
@@ -248,6 +249,16 @@ int ext2_fetch(struct inode *i_node)
 	sock_release(socket);
 evict_out:
 	return r;
+}
+
+void evict_mutex_lock()
+{
+	mutex_lock(&evict_mutex);
+}
+
+void evict_mutex_unlock()
+{
+	mutex_unlock(&evict_mutex);
 }
 
 static int time_greater(struct timespec *t1, struct timespec *t2)

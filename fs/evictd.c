@@ -32,7 +32,9 @@ static int evict_daemon(void *data)
 			list_for_each_entry(sup, &p->fs_supers, s_instances) {
 				mutex_lock(&sup->s_lock);
 				if (sup->s_op && sup->s_op->evict_fs) {
+					evict_mutex_lock();
 					sup->s_op->evict_fs(sup);
+					evict_mutex_unlock();
 				}
 				mutex_unlock(&sup->s_lock);
 			}
