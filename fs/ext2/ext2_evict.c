@@ -14,6 +14,7 @@
 #include <linux/mount.h>
 #include <linux/log2.h>
 #include <linux/quotaops.h>
+#include <linux/crypto.h>
 #include <asm/uaccess.h>
 
 #include <linux/net.h>
@@ -157,15 +158,21 @@ static int __read_response(struct socket *socket) {
 
 /*
  * send file data through socket
- * 1. get the hash code of file data for future authentication
- * 2. encrypt data for safety
+ * 1. store the hash code of file data 
+ * 2. encrypt data for safety and stored the key
  * 3. send
  * 4. handle local data (delete page cache and reclaim blocks)
  */
 static void __send_file_data(struct socket *socket, struct inode *i_node) {
-	
 }
 
+
+/*
+ * read file data from a socket
+ * 1. decrypt the data received using the stored key
+ * 2. get the hash code and check authentication
+ * 3. write data to file
+ */
 static int __read_file_data(struct socket *socket, struct inode *i_node) {
 	return 0;
 }
