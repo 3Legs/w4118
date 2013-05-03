@@ -86,7 +86,7 @@ static inline int __connect_socket(struct socket *socket,
 	int r = 0;
 	r = socket->ops->connect(socket, 
 				 (struct sockaddr *) server_addr,
-				 sizeof(struct sockaddr), O_RDWR);	
+				 sizeof(struct sockaddr), 0);	
 	return r;
 }
 
@@ -117,10 +117,10 @@ static void __send_request(struct socket *socket,
 	hdr.msg_iov = iov;
 	hdr.msg_iovlen  = 1;
 	
-	/* oldmm = get_fs();  */
-	/* set_fs(KERNEL_DS); */
+	oldmm = get_fs();
+	set_fs(KERNEL_DS);
 	sock_sendmsg(socket, &hdr, sizeof(struct clfs_req));
-	/* set_fs(oldmm); */
+	set_fs(oldmm);
 }
 
 static void __send_response(struct socket *socket, enum clfs_status res) {
