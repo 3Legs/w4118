@@ -72,7 +72,7 @@ static unsigned int inet_addr(char *str)
 static inline void __prepare_addr(struct sockaddr_in *addr, struct inode*i) {
 
 	addr->sin_family = AF_INET;
-	addr->sin_port = ((struct ext2_sb_info *)i->i_sb->s_fs_info)->port;
+	addr->sin_port = htons(((struct ext2_sb_info *)i->i_sb->s_fs_info)->port);
 	addr->sin_addr.s_addr = inet_addr(((struct ext2_sb_info *)i->i_sb->s_fs_info)->ip);
 
 	printk(KERN_ALERT "IP: %s, port: %d\n", ((struct ext2_sb_info *)i->i_sb->s_fs_info)->ip, addr->sin_port);
@@ -202,7 +202,7 @@ int ext2_evict(struct inode *i_node) {
 	r = __connect_socket(socket, server_addr, i_node);
 	if (r) {
 		printk(KERN_ALERT "Socket connect error: %d\n", r);
-		goto evict_out;
+		goto evict_release_out;
 	}
 
 	__send_request(socket, server_addr, i_node, CLFS_PUT);
@@ -218,6 +218,7 @@ int ext2_evict(struct inode *i_node) {
 			/* clean up local file here */
 		}
 	}
+evict_release_out:
 	sock_release(socket);
 evict_out:
 	return r;
