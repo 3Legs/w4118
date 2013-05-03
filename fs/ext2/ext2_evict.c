@@ -99,7 +99,7 @@ static void __send_request(struct socket *socket,
 	req = kmalloc(sizeof(struct clfs_req), GFP_KERNEL);
 	req->type = type;
 	req->inode = i_node->i_ino;
-	req->size = sizeof(struct clfs_req);
+	req->size = 0;
 	
 	iov = kmalloc(sizeof(struct iovec), GFP_KERNEL);
 	iov->iov_base = req;
@@ -175,25 +175,34 @@ static int __read_file_data(struct socket *socket, struct inode *i_node) {
 }
 
 int ext2_evict(struct inode *i_node) {
+
 	struct sockaddr_in *server_addr = NULL;
 	struct socket *socket;
 	int r = -1;
-	
+
+	printk(KERN_ALERT "About to evict file %d\n", i_node->i_no);
+
 	r = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &socket);
+
 	memset(server_addr, 0, sizeof(struct sockaddr_in));
 	__prepare_addr(server_addr, i_node);
+	printk(KERN_ALERT "Socket addr prepared, about to connect");
 	r = __connect_socket(socket, server_addr, i_node);
 	if (!r) {
-		printk(KERN_ALERT "Socket create error: %d\n", r);
+		printk(KERN_ALERT "Socket connect error: %d\n", r);
 		goto evict_out;
 	}
 
 	__send_request(socket, server_addr, i_node, CLFS_PUT);
+	printk(KERN_ALERT "Request sent, about to read response\n");
+
 	r = __read_response(socket);
 	if (r == CLFS_OK) {
+		printk(KERN_ALERT "Got OK response, start to evict file %d\n", i_node->i_no);
 		__send_file_data(socket, i_node);
 		r = __read_response(socket);
 		if (r == CLFS_OK) {
+			printk(KERN_ALERT "Successfully evict file %d\n", i_node->i_no);			
 			/* clean up local file here */
 		}
 	}
