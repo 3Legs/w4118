@@ -31,16 +31,25 @@
 
 #define d(x) printk(KERN_ALERT "%d\n", x)
 
-#ifndef EVICT_DEBUG
-#define EVICT_DEBUG 0
-#if EVICT_DEBUG
-static int _debug_mode = 1;
-#else
-static int _debug_mode = 0;
-#endif
-#endif
+enum clfs_status {
+	CLFS_OK = 0,            /* Success */
+	CLFS_INVAL = EINVAL,    /* Invalid address */
+	CLFS_ACCESS = EACCES,   /* Could not read/write file */
+	CLFS_ERROR              /* Other errors */
+};
 
-/* define structures */
+enum clfs_type {
+	CLFS_PUT,
+	CLFS_GET,
+	CLFS_RM
+};
+
+struct clfs_req {
+	enum clfs_type type;
+	unsigned long inode;
+	unsigned long size;
+};
+
 struct clock_hand {
 	long hand;
 };
@@ -58,41 +67,167 @@ static unsigned int inet_addr(char *str)
 	sscanf(str,"%d.%d.%d.%d",&a,&b,&c,&d);
 	arr[0] = a; arr[1] = b; arr[2] = c; arr[3] = d;
 	return *(unsigned int*)arr;
-} 
+}
+
+static inline void __prepare_addr(struct sockaddr_in *addr, struct inode*i) {
+
+	addr->sin_family = AF_INET;
+	addr->sin_port = ((struct ext2_sb_info *)i->i_sb->s_fs_info)->port;
+	addr->sin_addr.s_addr = inet_addr(((struct ext2_sb_info *)i->i_sb->s_fs_info)->ip);
+
+}
+
+static inline int __connect_socket(struct socket *socket,
+				   struct sockaddr_in* server_addr,
+				   struct inode* i)
+{
+	int r = 0;
+	r = socket->ops->connect(socket, 
+				 (struct sockaddr *) server_addr,
+				 sizeof(struct sockaddr), O_RDWR);	
+	return r;
+}
+
+static void __send_request(struct socket *socket, 
+			  struct sockaddr_in* addr, 
+			  struct inode *i_node,
+			  enum clfs_type type)
+{
+	struct clfs_req *req;
+	struct msghdr hdr;
+	struct iovec *iov;
+	mm_segment_t oldmm;
+
+	req = kmalloc(sizeof(struct clfs_req), GFP_KERNEL);
+	req->type = type;
+	req->inode = i_node->i_ino;
+	req->size = sizeof(struct clfs_req);
+	
+	iov = kmalloc(sizeof(struct iovec), GFP_KERNEL);
+	iov->iov_base = req;
+	iov->iov_len = sizeof(struct clfs_req);
+	
+	hdr.msg_name = addr;
+	hdr.msg_namelen = sizeof(struct sockaddr);
+	hdr.msg_control = NULL;
+	hdr.msg_controllen = 0;
+	hdr.msg_flags = MSG_DONTWAIT;
+	hdr.msg_iov = iov;
+	hdr.msg_iovlen  = 1;
+	
+	oldmm = get_fs(); 
+	set_fs(KERNEL_DS);
+	sock_sendmsg(socket, &hdr, sizeof(struct clfs_req));
+	set_fs(oldmm);
+}
+
+static void __send_response(struct socket *socket, enum clfs_status res) {
+	int response = (int)res;
+	struct msghdr hdr;
+	struct iovec *iov;
+	mm_segment_t oldmm;
+
+	iov = kmalloc(sizeof(struct iovec), GFP_KERNEL);
+	iov->iov_base = &response;
+	iov->iov_len = sizeof(int);
+	
+	hdr.msg_name = 0;
+	hdr.msg_namelen = 0;
+	hdr.msg_control = NULL;
+	hdr.msg_controllen = 0;
+	hdr.msg_flags = MSG_DONTWAIT;
+	hdr.msg_iov = iov;
+	hdr.msg_iovlen  = 1;
+	
+	oldmm = get_fs(); 
+	set_fs(KERNEL_DS);
+	sock_sendmsg(socket, &hdr, sizeof(int));
+	set_fs(oldmm);
+}
+
+static int __read_response(struct socket *socket) {
+	int response = 0;
+	struct msghdr hdr;
+	struct iovec *iov;
+	int len;
+
+	iov = kmalloc(sizeof(int), GFP_KERNEL);
+	iov->iov_base = &response;
+	iov->iov_len = sizeof(int);
+	
+	hdr.msg_name = NULL;
+	hdr.msg_namelen = 0;
+	hdr.msg_control = NULL;
+	hdr.msg_controllen = 0;
+	hdr.msg_flags = MSG_DONTWAIT;
+	hdr.msg_iov = iov;
+	hdr.msg_iovlen  = 1;
+	
+	len = sock_recvmsg(socket, &hdr, sizeof(int), 0);
+	if (len)
+		return response;
+	return CLFS_ERROR;
+}
+
+static void __send_file_data(struct socket *socket, struct inode *i_node) {
+}
+
+static int __read_file_data(struct socket *socket, struct inode *i_node) {
+	return 0;
+}
 
 int ext2_evict(struct inode *i_node) {
-
-	struct sockaddr_in server_addr;
+	struct sockaddr_in *server_addr = NULL;
 	struct socket *socket;
-	unsigned long buflen;
 	int r = -1;
-
-	if (_debug_mode) { return 0;}
-	
-	if (atomic_read(&i_node->i_count) > 0) {
-		/* inode has been mapped to a open file */
-		printk(KERN_ALERT "inode %lu has been mapped to a open file", i_node->i_ino);
-		return EMFILE;
-	}
 	
 	r = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &socket);
-	memset(&server_addr, 0, sizeof(server_addr));
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = ((struct ext2_sb_info *)i_node->i_sb->s_fs_info)->port;
-	server_addr.sin_addr.s_addr = inet_addr(((struct ext2_sb_info *)i_node->i_sb->s_fs_info)->ip);
+	memset(server_addr, 0, sizeof(struct sockaddr_in));
+	__prepare_addr(server_addr, i_node);
+	r = __connect_socket(socket, server_addr, i_node);
+	if (!r) {
+		printk(KERN_ALERT "Socket create error: %d\n", r);
+		goto evict_out;
+	}
 
-	r = socket->ops->connect(socket, 
-				 (struct sockaddr *) &server_addr,
-				 sizeof(server_addr), O_RDWR);
-	printk(KERN_ALERT "result: %d\n", r);
-	return 0;
+	__send_request(socket, server_addr, i_node, CLFS_PUT);
+	r = __read_response(socket);
+	if (r == CLFS_OK) {
+		__send_file_data(socket, i_node);
+		r = __read_response(socket);
+		if (r == CLFS_OK) {
+			/* clean up local file here */
+		}
+	}
+	sock_release(socket);
+evict_out:
+	return r;
 }
 
 int ext2_fetch(struct inode *i_node)
 {
-	if (_debug_mode) { return 0;}
+	struct sockaddr_in *server_addr = NULL;
+	struct socket *socket;
+	int r = -1;
+	
+	r = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &socket);
+	memset(server_addr, 0, sizeof(struct sockaddr_in));
+	__prepare_addr(server_addr, i_node);
+	r = __connect_socket(socket, server_addr, i_node);
+	if (!r) {
+		printk(KERN_ALERT "Socket create error: %d\n", r);
+		goto evict_out;
+	}
 
-	return 0;
+	__send_request(socket, server_addr, i_node, CLFS_GET);
+	r = __read_response(socket);
+	if (r == CLFS_OK) {
+		r = __read_file_data(socket, i_node);
+		__send_response(socket, (enum clfs_status) r);
+	}
+	sock_release(socket);
+evict_out:
+	return r;
 }
 
 static int time_greater(struct timespec *t1, struct timespec *t2)
