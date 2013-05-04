@@ -21,6 +21,7 @@
 #include <net/sock.h>
 #include <linux/tcp.h>
 #include <linux/in.h>
+#include <linux/inet.h>
 #include <linux/file.h>
 #include <linux/socket.h>
 #include <linux/smp_lock.h>
@@ -89,7 +90,7 @@ static inline void __prepare_msghdr(struct msghdr *hdr, struct iovec * iov, void
 static inline void __prepare_addr(struct sockaddr_in *addr, struct inode*i) {
 	addr->sin_family = AF_INET;
 	addr->sin_port = htons(((struct ext2_sb_info *)i->i_sb->s_fs_info)->port);
-	addr->sin_addr.s_addr = inet_addr(((struct ext2_sb_info *)i->i_sb->s_fs_info)->ip);
+	addr->sin_addr.s_addr = in_aton(((struct ext2_sb_info *)i->i_sb->s_fs_info)->ip);
 
 	printk(KERN_ALERT "IP: %s, port: %d\n", ((struct ext2_sb_info *)i->i_sb->s_fs_info)->ip, ntohs(addr->sin_port));
 
