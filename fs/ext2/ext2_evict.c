@@ -119,7 +119,7 @@ static void __send_request(struct socket *socket,
 	req = kmalloc(sizeof(struct clfs_req), GFP_KERNEL);
 	req->type = type;
 	req->inode = i_node->i_ino;
-	req->size = 0;
+	req->size = 14;
 	
 	__prepare_msghdr(&hdr, &iov, (void *) req, sizeof(struct clfs_req));
 	printk(KERN_ALERT "Req size: %d, Send size %d\n", hdr.msg_iov->iov_len, sizeof(struct clfs_req));
@@ -169,10 +169,10 @@ static void __send_file_data(struct socket *socket, struct inode *i_node) {
 	struct iovec iov;
 	mm_segment_t oldmm;
 	
-	__prepare_msghdr(&hdr, &iov, (void *) buf, 13);
+	__prepare_msghdr(&hdr, &iov, (void *) buf, 14);
 	oldmm = get_fs(); 
 	set_fs(KERNEL_DS);
-	sock_sendmsg(socket, &hdr, 13);
+	sock_sendmsg(socket, &hdr, 14);
 	set_fs(oldmm);
 }
 
