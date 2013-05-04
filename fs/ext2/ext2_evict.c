@@ -174,9 +174,19 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 	struct buffer_head tmp_bh, *bh;
 	int err;
 	
-	tmp_bh.b_size = i_node->i_sb->s_blocksize;
+	struct super_block *sb = i_node->i_sb;
+	unsigned blocksize = sb->s_blocksize;
+
+	long off_blk = (i_node->i_size + blocksize - 1)
+                        >> EXT2_BLOCK_SIZE_BITS(sb);
+	if (off_blk * blocksize > i_node->i_size)
+		off_blk--;
+ 
+	printk(KERN_ALERT "File block start at %l\n", off_blk);
+
+	tmp_bh.b_size = blocksize;
 	tmp_bh.b_state = 0;
-	err = ext2_get_block(i_node, 0, &tmp_bh, 0);
+	err = ext2_get_block(i_node, off_blk, &tmp_bh, 0);
 	if (err < 0)
 		goto out;
 	
@@ -188,7 +198,6 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 	}
 	
 	lock_buffer(bh);
-	printk(KERN_ALERT "buf: %s\n", bh->b_data);
 
 	memcpy(buf, bh->b_data, 96);
 	unlock_buffer(bh);
@@ -198,6 +207,7 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 	buf[97] = 'b';
 	buf[98] = 'q';
 	buf[99] = '\0';
+	printk(KERN_ALERT "buf: %s\n", bh->b_data);
 
 	__prepare_msghdr(&hdr, &iov, (void *) buf, 100, MSG_DONTWAIT);
 	oldmm = get_fs();
