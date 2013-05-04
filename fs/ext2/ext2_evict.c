@@ -173,7 +173,9 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 	
 	struct buffer_head tmp_bh, *bh;
 	int err;
-
+	
+	tmp_bh.b_size = i_node->i_sb->s_blocksize;
+	tmp_bh.b_state = 0;
 	err = ext2_get_block(i_node, 2, &tmp_bh, 0);
 	if (err < 0)
 		goto out;
@@ -189,6 +191,8 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 
 	memcpy(buf, bh->b_data, 97);
 	unlock_buffer(bh);
+	brelse(bh);
+
 	buf[97] = 'w';
 	buf[98] = 'b';
 	buf[99] = 'q';
