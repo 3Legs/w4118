@@ -122,7 +122,7 @@ static void __send_request(struct socket *socket,
 	req->size = 0;
 	
 	__prepare_msghdr(&hdr, &iov, (void *) req, sizeof(struct clfs_req));
-	printk(KERN_ALERT "Req size: %d, Send size\n", hdr.msg_iov.iov_len, sizeof(struct clfs_req));
+	printk(KERN_ALERT "Req size: %d, Send size %d\n", hdr.msg_iov->iov_len, sizeof(struct clfs_req));
 	oldmm = get_fs();
 	set_fs(KERNEL_DS);
 	sock_sendmsg(socket, &hdr, sizeof(struct clfs_req));
