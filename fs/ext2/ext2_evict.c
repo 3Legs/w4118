@@ -171,14 +171,14 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 	/* struct iovec iov; */
 	/* mm_segment_t oldmm; */
 	
-	struct buffer_head *tmp_bh, *bh;
+	struct buffer_head tmp_bh, *bh;
 	int err;
 
-	err = ext2_get_block(i_node, 0, tmp_bh, 0);
+	err = ext2_get_block(i_node, 0, &tmp_bh, 0);
 	if (err < 0)
 		goto out;
 	
-	bh = sb_getblk(i_node->i_sb, tmp_bh->b_blocknr);
+	bh = sb_getblk(i_node->i_sb, tmp_bh.b_blocknr);
 	if (!bh) {
 		err = -EIO;
 		goto out;
