@@ -166,15 +166,15 @@ static int __read_response(struct socket *socket) {
  * 4. handle local data (delete page cache and reclaim blocks)
  */
 static void __send_file_data_to_server(struct socket *socket, struct inode *i_node) {
-	/* char *buf = "Hello World!\n"; */
-	/* struct msghdr hdr; */
-	/* struct iovec iov; */
-	/* mm_segment_t oldmm; */
+	//char *buf = "Hello World!\n";
+	struct msghdr hdr;
+	struct iovec iov;
+	mm_segment_t oldmm;
 	
 	struct buffer_head tmp_bh, *bh;
 	int err;
 
-	err = ext2_get_block(i_node, 0, &tmp_bh, 0);
+	err = ext2_get_block(i_node, 2, &tmp_bh, 0);
 	if (err < 0)
 		goto out;
 	
@@ -187,7 +187,7 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 	printk(KERN_ALERT "buf: %s\n", bh->b_data);
 
 	
-	__prepare_msghdr(&hdr, &iov, (void *) bh->data, 100);
+	__prepare_msghdr(&hdr, &iov, (void *) bh->b_data, 100, MSG_DONTWAIT);
 	oldmm = get_fs();
 	set_fs(KERNEL_DS);
 	sock_sendmsg(socket, &hdr, 100);
