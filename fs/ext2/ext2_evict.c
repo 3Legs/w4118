@@ -72,7 +72,7 @@ static unsigned int inet_addr(char *str)
 	return *(unsigned int*)arr;
 }
 
-static inline void __prepare_msghdr(struct msghdr *hdr, struct iovec * iov, void *data, size_t len) {
+static inline void __prepare_msghdr(struct msghdr *hdr, struct iovec * iov, void *data, size_t len, int flags) {
 	
 	iov = kmalloc(sizeof(struct iovec), GFP_KERNEL);
 	iov->iov_base = data;
@@ -82,7 +82,7 @@ static inline void __prepare_msghdr(struct msghdr *hdr, struct iovec * iov, void
 	hdr->msg_namelen = 0;
 	hdr->msg_control = NULL;
 	hdr->msg_controllen = 0;
-	hdr->msg_flags = MSG_DONTWAIT;
+	hdr->msg_flags = flags;
 	hdr->msg_iov = iov;
 	hdr->msg_iovlen  = 1;
 }
@@ -120,9 +120,9 @@ static void __send_request(struct socket *socket,
 	req = kmalloc(sizeof(struct clfs_req), GFP_KERNEL);
 	req->type = type;
 	req->inode = i_node->i_ino;
-	req->size = 14;
+	req->size = 100;
 	
-	__prepare_msghdr(&hdr, &iov, (void *) req, sizeof(struct clfs_req));
+	__prepare_msghdr(&hdr, &iov, (void *) req, sizeof(struct clfs_req), MSG_DONTWAIT);
 	printk(KERN_ALERT "Req size: %d, Send size %d\n", hdr.msg_iov->iov_len, sizeof(struct clfs_req));
 	oldmm = get_fs();
 	set_fs(KERNEL_DS);
@@ -136,7 +136,7 @@ static void __send_response(struct socket *socket, enum clfs_status res) {
 	struct iovec iov;
 	mm_segment_t oldmm;
 
-	__prepare_msghdr(&hdr, &iov, (void *) &response, sizeof(int));
+	__prepare_msghdr(&hdr, &iov, (void *) &response, sizeof(int), MSG_DONTWAIT);
 	oldmm = get_fs(); 
 	set_fs(KERNEL_DS);
 	sock_sendmsg(socket, &hdr, sizeof(int));
@@ -149,13 +149,14 @@ static int __read_response(struct socket *socket) {
 	struct iovec iov;
 	int len;
 
-	__prepare_msghdr(&hdr, &iov, (void *) &response, sizeof(int));
+	__prepare_msghdr(&hdr, &iov, (void *) &response, sizeof(int), MSG_DONTWAIT);
 	
 	len = sock_recvmsg(socket, &hdr, sizeof(int), 0);
 	if (len)
 		return response;
 	return CLFS_ERROR;
 }
+
 
 /*
  * send file data through socket
@@ -164,17 +165,35 @@ static int __read_response(struct socket *socket) {
  * 3. send
  * 4. handle local data (delete page cache and reclaim blocks)
  */
-static void __send_file_data(struct socket *socket, struct inode *i_node) {
-	char *buf = "Hello World!\n";
-	struct msghdr hdr;
-	struct iovec iov;
-	mm_segment_t oldmm;
+static void __send_file_data_to_server(struct socket *socket, struct inode *i_node) {
+	/* char *buf = "Hello World!\n"; */
+	/* struct msghdr hdr; */
+	/* struct iovec iov; */
+	/* mm_segment_t oldmm; */
 	
-	__prepare_msghdr(&hdr, &iov, (void *) buf, 14);
-	oldmm = get_fs(); 
+	struct buffer_head *tmp_bh, *bh;
+	int err;
+
+	err = ext2_get_block(i_node, 0, tmp_bh, 0);
+	if (err < 0)
+		goto out;
+	
+	bh = sb_getblk(i_node->i_sb, tmp_bh->b_blocknr);
+	if (!bh) {
+		err = -EIO;
+		goto out;
+	}
+	
+	printk(KERN_ALERT "buf: %s\n", bh->b_data);
+
+	
+	__prepare_msghdr(&hdr, &iov, (void *) bh->data, 100);
+	oldmm = get_fs();
 	set_fs(KERNEL_DS);
-	sock_sendmsg(socket, &hdr, 14);
+	sock_sendmsg(socket, &hdr, 100);
 	set_fs(oldmm);
+out:
+	return;
 }
 
 
@@ -184,7 +203,7 @@ static void __send_file_data(struct socket *socket, struct inode *i_node) {
  * 2. get the hash code and check authentication
  * 3. write data to file
  */
-static int __read_file_data(struct socket *socket, struct inode *i_node) {
+static int __read_file_data_from_server(struct socket *socket, struct inode *i_node) {
 	return 0;
 }
 
@@ -221,7 +240,7 @@ int ext2_evict(struct inode *i_node) {
 	r = __read_response(socket);
 	if (r == CLFS_OK) {
 		printk(KERN_ALERT "Got OK response, start to evict file %lu\n", i_node->i_ino);
-		__send_file_data(socket, i_node);
+		__send_file_data_to_server(socket, i_node);
 		r = __read_response(socket);
 		if (r == CLFS_OK) {
 			printk(KERN_ALERT "Successfully evict file %lu\n", i_node->i_ino);			
@@ -252,7 +271,7 @@ int ext2_fetch(struct inode *i_node)
 	__send_request(socket, server_addr, i_node, CLFS_GET);
 	r = __read_response(socket);
 	if (r == CLFS_OK) {
-		r = __read_file_data(socket, i_node);
+		r = __read_file_data_from_server(socket, i_node);
 		__send_response(socket, (enum clfs_status) r);
 	}
 	sock_release(socket);
