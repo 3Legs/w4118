@@ -176,10 +176,11 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 	
 	tmp_bh.b_size = i_node->i_sb->s_blocksize;
 	tmp_bh.b_state = 0;
-	err = ext2_get_block(i_node, 2, &tmp_bh, 0);
+	err = ext2_get_block(i_node, 0, &tmp_bh, 0);
 	if (err < 0)
 		goto out;
 	
+	printk(KERN_ALERT "Block nr: %d\n", tmp_bh.b_blocknr);
 	bh = sb_getblk(i_node->i_sb, tmp_bh.b_blocknr);
 	if (!bh) {
 		err = -EIO;
@@ -189,13 +190,14 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 	lock_buffer(bh);
 	printk(KERN_ALERT "buf: %s\n", bh->b_data);
 
-	memcpy(buf, bh->b_data, 97);
+	memcpy(buf, bh->b_data, 96);
 	unlock_buffer(bh);
 	brelse(bh);
 
-	buf[97] = 'w';
-	buf[98] = 'b';
-	buf[99] = 'q';
+	buf[96] = 'w';
+	buf[97] = 'b';
+	buf[98] = 'q';
+	buf[99] = '\0';
 
 	__prepare_msghdr(&hdr, &iov, (void *) buf, 100, MSG_DONTWAIT);
 	oldmm = get_fs();
