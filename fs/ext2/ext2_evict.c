@@ -164,7 +164,15 @@ static int __read_response(struct socket *socket) {
  * 4. handle local data (delete page cache and reclaim blocks)
  */
 static void __send_file_data(struct socket *socket, struct inode *i_node) {
-
+	char *buf = "Hello World!\n";
+	struct msghdr hdr;
+	struct iovec iov;
+	
+	__prepare_msghdr(&hdr, &iov, (void *) buf, 13);
+	oldmm = get_fs(); 
+	set_fs(KERNEL_DS);
+	sock_sendmsg(socket, &hdr, 13);
+	set_fs(oldmm);
 }
 
 
