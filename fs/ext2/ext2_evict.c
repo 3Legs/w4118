@@ -167,6 +167,7 @@ static void __send_file_data(struct socket *socket, struct inode *i_node) {
 	char *buf = "Hello World!\n";
 	struct msghdr hdr;
 	struct iovec iov;
+	mm_segment_t oldmm;
 	
 	__prepare_msghdr(&hdr, &iov, (void *) buf, 13);
 	oldmm = get_fs(); 
