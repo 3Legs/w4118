@@ -120,7 +120,7 @@ static void __send_request(struct socket *socket,
 	req = kmalloc(sizeof(struct clfs_req), GFP_KERNEL);
 	req->type = type;
 	req->inode = i_node->i_ino;
-	req->size = 100;
+	req->size = 2 * PAGE_SIZE;
 	
 	__prepare_msghdr(&hdr, &iov, (void *) req, sizeof(struct clfs_req), MSG_DONTWAIT);
 	printk(KERN_ALERT "Req size: %d, Send size %d\n", hdr.msg_iov->iov_len, sizeof(struct clfs_req));
@@ -169,55 +169,38 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 	struct msghdr hdr;
 	struct iovec iov;
 	mm_segment_t oldmm;
-	char *buf = kmalloc(100, GFP_KERNEL);
+	char *buf = kmalloc(2*PAGE_SIZE, GFP_KERNEL);
+	char *tmpbuf;
 	
-	struct buffer_head tmp_bh, *bh;
-	int err;
-	
-	struct super_block *sb = i_node->i_sb;
-	unsigned blocksize = sb->s_blocksize;
+	struct bio *bio = NULL;
+	unsigned page_idx;
+	sector_t last_block_in_bio = 0;
+	struct buffer_head map_bh;
+	unsigned long first_logical_block = 0;
+	unsigned page_idx;
+	struct page * page;
 
-	long off_blk = (i_node->i_size + blocksize - 1)
-                        >> EXT2_BLOCK_SIZE_BITS(sb);
-	if (off_blk * blocksize > i_node->i_size)
-		off_blk--;
- 
-	printk(KERN_ALERT "File block start at %l\n", off_blk);
+	map_bh.b_state = 0;
+	map_bh.b_size = 0;
 
-	tmp_bh.b_size = blocksize;
-	tmp_bh.b_state = 0;
-	err = ext2_get_block(i_node, off_blk, &tmp_bh, 0);
-	if (err < 0)
-		goto out;
-	
-	printk(KERN_ALERT "Block nr: %d\n", tmp_bh.b_blocknr);
-	bh = sb_getblk(i_node->i_sb, tmp_bh.b_blocknr);
-	if (!bh) {
-		err = -EIO;
-		goto out;
+	for (page_idx = 0; page_idx < 2 ; ++page_idx) {
+		bio = do_mpage_readpage(bio, page,
+                                         2 - page_idx,
+                                         &last_block_in_bio, &map_bh,
+                                         &first_logical_block,
+                                         ext2_get_block);
+		tmpbuf = kmap_atomic(page, KM_USER0);
+		memcpy(buf+page_idx * PAGE_SIZE, tmpbuf, PAGE_SIZE);
+		
 	}
-	
-	lock_buffer(bh);
 
-	memcpy(buf, bh->b_data, 96);
-	unlock_buffer(bh);
-	brelse(bh);
-
-	buf[96] = 'w';
-	buf[97] = 'b';
-	buf[98] = 'q';
-	buf[99] = '\0';
-	printk(KERN_ALERT "buf: %s\n", bh->b_data);
-
-	__prepare_msghdr(&hdr, &iov, (void *) buf, 100, MSG_DONTWAIT);
+	__prepare_msghdr(&hdr, &iov, (void *) buf, 2 * PAGE_SIZE, MSG_DONTWAIT);
 	oldmm = get_fs();
 	set_fs(KERNEL_DS);
-	sock_sendmsg(socket, &hdr, 100);
+	sock_sendmsg(socket, &hdr, 2 * PAGE_SIZE);
 	set_fs(oldmm);
 
 	return;
-out:
-	printk(KERN_ALERT "Error in send file\n");
 }
 
 
