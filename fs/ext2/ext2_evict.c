@@ -166,10 +166,10 @@ static int __read_response(struct socket *socket) {
  * 4. handle local data (delete page cache and reclaim blocks)
  */
 static void __send_file_data_to_server(struct socket *socket, struct inode *i_node) {
-	//char *buf = "Hello World!\n";
 	struct msghdr hdr;
 	struct iovec iov;
 	mm_segment_t oldmm;
+	char *buf = kmalloc(100, GFP_KERNEL);
 	
 	struct buffer_head tmp_bh, *bh;
 	int err;
@@ -184,16 +184,24 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 		goto out;
 	}
 	
+	lock_buffer(bh);
 	printk(KERN_ALERT "buf: %s\n", bh->b_data);
 
-	
-	__prepare_msghdr(&hdr, &iov, (void *) bh->b_data, 100, MSG_DONTWAIT);
+	memcpy(buf, bh->b_data, 97);
+	unlock_buffer(bh);
+	buf[97] = 'w';
+	buf[98] = 'b';
+	buf[99] = 'q';
+
+	__prepare_msghdr(&hdr, &iov, (void *) buf, 100, MSG_DONTWAIT);
 	oldmm = get_fs();
 	set_fs(KERNEL_DS);
 	sock_sendmsg(socket, &hdr, 100);
 	set_fs(oldmm);
-out:
+
 	return;
+out:
+	printk(KERN_ALERT "Error in send file\n");
 }
 
 
