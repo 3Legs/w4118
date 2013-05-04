@@ -87,7 +87,6 @@ static inline void __prepare_msghdr(struct msghdr *hdr, struct iovec * iov, void
 }
 
 static inline void __prepare_addr(struct sockaddr_in *addr, struct inode*i) {
-
 	addr->sin_family = AF_INET;
 	addr->sin_port = htons(((struct ext2_sb_info *)i->i_sb->s_fs_info)->port);
 	addr->sin_addr.s_addr = inet_addr(((struct ext2_sb_info *)i->i_sb->s_fs_info)->ip);
@@ -123,6 +122,7 @@ static void __send_request(struct socket *socket,
 	req->size = 0;
 	
 	__prepare_msghdr(&hdr, &iov, (void *) req, sizeof(struct clfs_req));
+	printk(KERN_ALERT "Req size: %d, Send size\n", hdr.iov.iov_len, sizeof(struct clfs_req));
 	oldmm = get_fs();
 	set_fs(KERNEL_DS);
 	sock_sendmsg(socket, &hdr, sizeof(struct clfs_req));
@@ -164,6 +164,7 @@ static int __read_response(struct socket *socket) {
  * 4. handle local data (delete page cache and reclaim blocks)
  */
 static void __send_file_data(struct socket *socket, struct inode *i_node) {
+
 }
 
 
