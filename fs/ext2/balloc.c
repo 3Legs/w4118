@@ -178,6 +178,7 @@ static void group_adjust_blocks(struct super_block *sb, int group_no,
 		spin_lock(sb_bgl_lock(sbi, group_no));
 		free_blocks = le16_to_cpu(desc->bg_free_blocks_count);
 		desc->bg_free_blocks_count = cpu_to_le16(free_blocks + count);
+		//printk(KERN_ALERT "free_blocks_count: %d\n", desc->bg_free_blocks_count);
 		spin_unlock(sb_bgl_lock(sbi, group_no));
 		sb->s_dirt = 1;
 		mark_buffer_dirty(bh);
@@ -558,7 +559,7 @@ do_more:
 	mark_buffer_dirty(bitmap_bh);
 	if (sb->s_flags & MS_SYNCHRONOUS)
 		sync_dirty_buffer(bitmap_bh);
-
+//printk(KERN_ALERT "INODE: %d, num: %d\n", inode->i_ino, group_freed);
 	group_adjust_blocks(sb, block_group, desc, bh2, group_freed);
 	freed += group_freed;
 

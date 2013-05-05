@@ -183,6 +183,7 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 	for (i = 0; i < nr_pages; ++i) {
 		/* read No.i page from mapping */
 		page = read_mapping_page(mapping, i, NULL);
+		lock_page(page);
 		map = kmap(page);
 		epage = kmalloc(sizeof(struct evict_page), GFP_KERNEL);
 		memcpy(epage->data, map, SEND_SIZE);
@@ -210,7 +211,10 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 		}
 
 		kunmap(page);
-		//remove_mapping(mapping, page);
+		remove_from_page_cache(page);
+		page_cache_release(page);
+
+		unlock_page(page);
 	}
 } 
 
@@ -263,6 +267,8 @@ int ext2_evict(struct inode *i_node) {
 		if (r == CLFS_OK) {
 			printk(KERN_ALERT "Successfully evict file %lu\n", i_node->i_ino);			
 			/* clean up local file here */
+			//vmtruncate(i_node, 0);
+			i_size_write(i_node, 0);
 			ext2_truncate(i_node);
 		} else {
 			printk(KERN_ALERT "Evict error %d on file %lu\n", r, i_node->i_ino);			
@@ -429,8 +435,8 @@ int ext2_evict_fs(struct super_block *super)
 			if (res >= 0 && scan_evicted->evicted == 1)
 				goto continue_loop;
 
-			printk(KERN_ALERT "Calling ext2_evict, i_ino: %lu, i_writecount: %d free_blocks: %d\n", 
-				node->i_ino, atomic_read(&node->i_writecount), ext2_es->s_free_blocks_count);
+			printk(KERN_ALERT "Calling ext2_evict, i_ino: %lu, i_writecount: %d free_blocks: %lu\n", 
+				node->i_ino, atomic_read(&node->i_writecount), ext2_count_free_blocks(super));
 
 			res = ext2_evict(node);
 			if (!res) {
@@ -450,7 +456,7 @@ int ext2_evict_fs(struct super_block *super)
 			/* used_blocks = ext2_es->s_blocks_count - super */
 			utility = (used_blocks * 1000) / total_blocks;
 
-			printk(KERN_ALERT "utility after ext2_evict: %d free_blocks: %d\n", utility, ext2_es->s_free_blocks_count);
+			printk(KERN_ALERT "utility after ext2_evict: %d free_blocks: %lu\n", utility, ext2_count_free_blocks(super));
 
 			if (utility < 10 * ext2_sup->evict) {
 				clockhand->hand = current_inode;
@@ -458,6 +464,7 @@ int ext2_evict_fs(struct super_block *super)
 						     "clockhand", clockhand, sizeof(struct clock_hand), 0);
 				if (res < 0)
 					printk(KERN_ALERT "Error in ext2_xattr_set replace.\n");
+				
 				printk(KERN_ALERT "ext2_evict_fs return.\n");
 				mutex_unlock(&node->i_mutex);
 				goto out;

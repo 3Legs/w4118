@@ -1182,21 +1182,11 @@ int generic_file_open(struct inode * inode, struct file * filp)
 	struct evicted *evicted = kmalloc(sizeof(struct evicted), GFP_KERNEL);
 	printk(KERN_ALERT "Inode %lu will be opened.\n", inode->i_ino);
 	res = ext2_xattr_get(inode, EXT2_XATTR_INDEX_TRUSTED, "evicted", evicted, sizeof(struct evicted));
-	if (res < 0) {
-		evicted->evicted = 0;
-		val = 0;
-		res = ext2_xattr_set(inode, EXT2_XATTR_INDEX_TRUSTED, "evicted", evicted, sizeof(struct evicted), XATTR_CREATE);
-		if (res < 0) {
-			printk(KERN_ALERT "Error in ext2_xattr_set create. In generic_file_open.\n");
-			return -1;
-		}
-	} else {
-		val = evicted->evicted;
-	}
 
-	if (val) {
+	if (res >= 0 && evicted->evicted) {
 		res = ext2_fetch(inode);
 	}
+	kfree(evicted);
 	
 	if (!(filp->f_flags & O_LARGEFILE) && i_size_read(inode) > MAX_NON_LFS)
 		return -EOVERFLOW;
