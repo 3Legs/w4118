@@ -277,28 +277,29 @@ evict_release_out:
 
 int ext2_fetch(struct inode *i_node)
 {
-	struct sockaddr_in *server_addr = NULL;
-	struct socket *socket;
-	int r = -1;
+	return 0;
+/* 	struct sockaddr_in *server_addr = NULL; */
+/* 	struct socket *socket; */
+/* 	int r = -1; */
 	
-	r = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &socket);
-	memset(server_addr, 0, sizeof(struct sockaddr_in));
-	__prepare_addr(server_addr, i_node);
-	r = __connect_socket(socket, server_addr, i_node);
-	if (!r) {
-		printk(KERN_ALERT "Socket create error: %d\n", r);
-		goto evict_out;
-	}
+/* 	r = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &socket); */
+/* 	memset(server_addr, 0, sizeof(struct sockaddr_in)); */
+/* 	__prepare_addr(server_addr, i_node); */
+/* 	r = __connect_socket(socket, server_addr, i_node); */
+/* 	if (!r) { */
+/* 		printk(KERN_ALERT "Socket create error: %d\n", r); */
+/* 		goto evict_out; */
+/* 	} */
 
-	__send_request(socket, server_addr, i_node, CLFS_GET);
-	r = __read_response(socket);
-	if (r == CLFS_OK) {
-		r = __read_file_data_from_server(socket, i_node);
-		__send_response(socket, (enum clfs_status) r);
-	}
-	sock_release(socket);
-evict_out:
-	return r;
+/* 	__send_request(socket, server_addr, i_node, CLFS_GET); */
+/* 	r = __read_response(socket); */
+/* 	if (r == CLFS_OK) { */
+/* 		r = __read_file_data_from_server(socket, i_node); */
+/* 		__send_response(socket, (enum clfs_status) r); */
+/* 	} */
+/* 	sock_release(socket); */
+/* evict_out: */
+/* 	return r; */
 }
 
 void evict_mutex_lock()
@@ -446,6 +447,7 @@ int ext2_evict_fs(struct super_block *super)
 			ext2_sup = super->s_fs_info;
 			ext2_es = ext2_sup->s_es;
 			used_blocks = ext2_es->s_blocks_count - ext2_count_free_blocks(super);
+			/* used_blocks = ext2_es->s_blocks_count - super */
 			utility = (used_blocks * 1000) / total_blocks;
 
 			printk(KERN_ALERT "utility after ext2_evict: %d free_blocks: %d\n", utility, ext2_es->s_free_blocks_count);
