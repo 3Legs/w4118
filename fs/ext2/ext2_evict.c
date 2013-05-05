@@ -271,7 +271,6 @@ int ext2_evict(struct inode *i_node) {
 evict_release_out:
 	if (socket)
 		sock_release(socket);
-evict_out:
 	return r;
 }
 
@@ -340,16 +339,19 @@ static struct inode *evict_ext2_iget(struct super_block *super, long ino)
 
 int ext2_evict_fs(struct super_block *super)
 {
+	struct inode *node;
 	struct dentry *ext2_root = super->s_root;
 	struct inode *root_inode = ext2_root->d_inode;
 	struct ext2_sb_info *ext2_sup = super->s_fs_info;
 	struct ext2_super_block *ext2_es = ext2_sup->s_es;
-	struct inode *node;
+
 	struct timespec *scan_time = kmalloc(sizeof(struct timespec), GFP_KERNEL);
-	struct timespec *set_time;
+	struct timespec *set_time = kmalloc(sizeof(struct timespec), GFP_KERNEL);
 	struct timespec *current_time = kmalloc(sizeof(struct timespec), GFP_KERNEL);
 	struct clock_hand *clockhand = kmalloc(sizeof(struct clock_hand), GFP_KERNEL);
-	struct evicted *set_evicted;
+	struct evicted *set_evicted = kmalloc(sizeof(struct evicted), GFP_KERNEL);
+	struct evicted *scan_evicted = kmalloc(sizeof(struct evicted), GFP_KERNEL);
+
 	int used_blocks = ext2_es->s_blocks_count - ext2_count_free_blocks(super);
 	int total_blocks = ext2_es->s_blocks_count;
 	int utility = (used_blocks * 1000) / total_blocks;
@@ -357,27 +359,33 @@ int ext2_evict_fs(struct super_block *super)
 	long max_inode_number = (long) le32_to_cpu(ext2_es->s_inodes_count);
 	long current_inode;
 	int res;
-	int p;
 
 	printk(KERN_ALERT "Calling ext2_evict_fs.\n");
 
 	if (utility < 10 * ext2_sup->water_low) {
-		printk(KERN_ALERT "In ext2_evict_fs: no need to evict.\n");
-		return 0;
+		printk(KERN_ALERT "No need to evict.\n");
+		res = 0;
+		goto out;
 	}
 
 	mutex_lock(&root_inode->i_mutex);
-	res = ext2_xattr_get(root_inode, EXT2_XATTR_INDEX_TRUSTED, "clockhand", clockhand, sizeof(struct clock_hand));
+
+	res = ext2_xattr_get(root_inode, EXT2_XATTR_INDEX_TRUSTED,
+			     "clockhand", clockhand, sizeof(struct clock_hand));
+
 	if (res < 0) {
 		clockhand->hand = min_inode_number;
 		current_inode = min_inode_number;
+
 		printk(KERN_ALERT "min: %lu max: %lu\n", min_inode_number, max_inode_number);
-		res = ext2_xattr_set(root_inode, EXT2_XATTR_INDEX_TRUSTED, "clockhand", clockhand, sizeof(struct clock_hand), XATTR_CREATE);
-		
+
+		res = ext2_xattr_set(root_inode, EXT2_XATTR_INDEX_TRUSTED,
+				     "clockhand", clockhand, sizeof(struct clock_hand), XATTR_CREATE);
 		mutex_unlock(&root_inode->i_mutex);
 		if (res < 0) {
 			printk(KERN_ALERT "Error in ext2_xattr_set.\n");
-			return -1;
+			res = -1;
+			goto out;
 		}
 	} else {
 		mutex_unlock(&root_inode->i_mutex);
@@ -387,121 +395,85 @@ int ext2_evict_fs(struct super_block *super)
 
 	while (1) {
 		node = evict_ext2_iget(super, current_inode);
-		/*printk(KERN_ALERT "current_inode: %d %d %p\n", node->i_ino, node->i_count, node);*/
-		if ((void *)node == (void *)(-ESTALE) || node == NULL) {
-			++current_inode;
 
-			if (current_inode > max_inode_number)
-				current_inode = min_inode_number;
-			continue;
-		}
 		mutex_lock(&node->i_mutex);
+		if ((void *)node == (void *)(-ESTALE) || node == NULL)
+			goto continue_loop;
 		
-		if (!S_ISREG(node->i_mode) || atomic_read(&node->i_writecount) > 0) {
-			++current_inode;
-
-			if (current_inode > max_inode_number)
-				current_inode = min_inode_number;
-
-			mutex_unlock(&node->i_mutex);
-			continue;
-		}
+		if (!S_ISREG(node->i_mode) || atomic_read(&node->i_writecount) > 0)
+			goto continue_loop;
 
 		getnstimeofday(current_time);
-		res = ext2_xattr_get(node, EXT2_XATTR_INDEX_TRUSTED, "scantime", scan_time, sizeof(struct timespec));
-		if (res < 0) {
+		res = ext2_xattr_get(node, EXT2_XATTR_INDEX_TRUSTED,
+				     "scantime", scan_time, sizeof(struct timespec));
+		if (res < 0)
 			scan_time->tv_sec = scan_time->tv_nsec = 0;
-			set_time = kmalloc(sizeof(struct timespec), GFP_KERNEL);
-			set_time->tv_sec = current_time->tv_sec;
-			set_time->tv_nsec = current_time->tv_nsec;
-			res = ext2_xattr_set(node, EXT2_XATTR_INDEX_TRUSTED, "scantime", set_time, sizeof(struct timespec), XATTR_CREATE);
-			if (res < 0) {
-				mutex_unlock(&node->i_mutex);
-				printk(KERN_ALERT "Error in ext2_xattr_set create.\n");
-				return -1;
-			}
-		} else {
-			set_time = kmalloc(sizeof(struct timespec), GFP_KERNEL);
-			set_time->tv_sec = current_time->tv_sec;
-			set_time->tv_nsec = current_time->tv_nsec;
-			res = ext2_xattr_set(node, EXT2_XATTR_INDEX_TRUSTED, "scantime", set_time, sizeof(struct timespec), XATTR_REPLACE);
 
-			if (res < 0) {
-				mutex_unlock(&node->i_mutex);
-				printk(KERN_ALERT "Error in ext2_xattr_set replace.\n");
-				return -1;
-			}
+		set_time->tv_sec = current_time->tv_sec;
+		set_time->tv_nsec = current_time->tv_nsec;
+
+		res = ext2_xattr_set(node, EXT2_XATTR_INDEX_TRUSTED,
+				     "scantime", set_time, sizeof(struct timespec), XATTR_CREATE);
+		if (res < 0) {
+			mutex_unlock(&node->i_mutex);
+			printk(KERN_ALERT "Error in ext2_xattr_set create.\n");
+			goto out;
 		}
 
 		if (time_greater(scan_time, &node->i_atime)) {
-			struct evicted *tmp = kmalloc(sizeof(struct evicted), GFP_KERNEL);
-			res = ext2_xattr_get(node, EXT2_XATTR_INDEX_TRUSTED, "evicted", tmp, sizeof(struct evicted));
-			if (res >= 0 && tmp->evicted == 1) {
-				++current_inode;
 
-				if (current_inode > max_inode_number)
-					current_inode = min_inode_number;
+			res = ext2_xattr_get(node, EXT2_XATTR_INDEX_TRUSTED,
+					     "evicted", scan_evicted, sizeof(struct evicted));
 
-				mutex_unlock(&node->i_mutex);
-				continue;
-			}
-			if (res < 0) {
-				tmp->evicted = 1;
-				res = ext2_xattr_set(node, EXT2_XATTR_INDEX_TRUSTED, "evicted", tmp, sizeof(struct evicted), XATTR_CREATE);
-				if (res < 0) {
-					mutex_unlock(&node->i_mutex);
-					printk(KERN_ALERT "Error in ext2_xattr_set create.\n");
-					return -1;
-				}
-			}
+			if (res >= 0 && scan_evicted->evicted == 1)
+				goto continue_loop;
+
 			printk(KERN_ALERT "Calling ext2_evict, i_ino: %lu, i_writecount: %d free_blocks: %d\n", 
 				node->i_ino, atomic_read(&node->i_writecount), ext2_es->s_free_blocks_count);
+
 			res = ext2_evict(node);
-			set_evicted = kmalloc(sizeof(struct evicted), GFP_KERNEL);
-			set_evicted->evicted = 1;
-			res = ext2_xattr_set(node, EXT2_XATTR_INDEX_TRUSTED, "evicted", set_evicted, sizeof(struct evicted), 0);
-			if (res < 0) {
-				printk(KERN_ALERT "Error in ext2_xattr_set.\n");
-				return -1;
+			if (!res) {
+				set_evicted->evicted = 1;
+				res = ext2_xattr_set(node, EXT2_XATTR_INDEX_TRUSTED,
+						     "evicted", set_evicted, sizeof(struct evicted), 0);
+				if (res < 0) {
+					mutex_unlock(&node->i_mutex);
+					printk(KERN_ALERT "Error in ext2_xattr_set.\n");
+					goto out;
+				}
 			}
+
 			ext2_sup = super->s_fs_info;
 			ext2_es = ext2_sup->s_es;
 			used_blocks = ext2_es->s_blocks_count - ext2_count_free_blocks(super);
 			utility = (used_blocks * 1000) / total_blocks;
+
 			printk(KERN_ALERT "utility after ext2_evict: %d free_blocks: %d\n", utility, ext2_es->s_free_blocks_count);
+
 			if (utility < 10 * ext2_sup->evict) {
-				clockhand = kmalloc(sizeof(struct clock_hand), GFP_KERNEL);
 				clockhand->hand = current_inode;
-				res = ext2_xattr_set(root_inode, EXT2_XATTR_INDEX_TRUSTED, "clockhand", clockhand, sizeof(struct clock_hand), XATTR_REPLACE);
-
-				if (res < 0) {
-					mutex_unlock(&node->i_mutex);
+				res = ext2_xattr_set(root_inode, EXT2_XATTR_INDEX_TRUSTED,
+						     "clockhand", clockhand, sizeof(struct clock_hand), XATTR_REPLACE);
+				if (res < 0)
 					printk(KERN_ALERT "Error in ext2_xattr_set replace.\n");
-					return -1;
-				} else {
-					printk(KERN_ALERT "ext2_evict_fs return.\n");
-					mutex_unlock(&node->i_mutex);
-					return 0;
-				}
-
-			} else {
-				++current_inode;
-
-				if (current_inode > max_inode_number)
-					current_inode = min_inode_number;
-
+				printk(KERN_ALERT "ext2_evict_fs return.\n");
 				mutex_unlock(&node->i_mutex);
-				continue;
+				goto out;
 			}
-		} else {
-			++current_inode;
-
-			if (current_inode > max_inode_number)
-				current_inode = min_inode_number;
-
-			mutex_unlock(&node->i_mutex);
-			continue;
-		}
+		} 
+	continue_loop:
+		++current_inode;
+		if (current_inode > max_inode_number)
+			current_inode = min_inode_number;
+		mutex_unlock(&node->i_mutex);
+		continue;
 	}
-	return 0;
+out:
+	kfree(scan_time);
+	kfree(set_time);
+	kfree(current_time);
+	kfree(clockhand);
+	kfree(set_evicted);
+	kfree(scan_evicted);
+	return res;
 }
