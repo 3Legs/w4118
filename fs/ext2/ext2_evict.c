@@ -239,7 +239,7 @@ int ext2_evict(struct inode *i_node) {
 	server_addr = kmalloc(sizeof(struct sockaddr_in), GFP_KERNEL);
 	if (!server_addr) {
 		printk(KERN_ALERT "kmalloc error \n");
-		goto evict_out;
+		goto evict_release_out;
 	}
 
 	__prepare_addr(server_addr, i_node);
@@ -261,12 +261,15 @@ int ext2_evict(struct inode *i_node) {
 		if (r == CLFS_OK) {
 			printk(KERN_ALERT "Successfully evict file %lu\n", i_node->i_ino);			
 			/* clean up local file here */
+			ext2_truncate(i_node);
+		} else {
+			printk(KERN_ALERT "Evict error %d on file %lu\n", r, i_node->i_ino);			
 		}
 	}
 
-	ext2_truncate(i_node);
 evict_release_out:
-	sock_release(socket);
+	if (socket)
+		sock_release(socket);
 evict_out:
 	return r;
 }
