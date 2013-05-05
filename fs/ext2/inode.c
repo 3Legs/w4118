@@ -381,16 +381,16 @@ static int ext2_alloc_blocks(struct inode *inode,
 		/* Linux kernel does not support floating number manipulation */
 		/* So we have to calculate the utility this way */
 		int utility = (used_blocks * 1000) / total_blocks;
-
+#define EVICT_DEBUG
 #ifdef EVICT_DEBUG
-		printk(KERN_ALERT "used: %d total: %d  water_high: %d\n", 
-			used_blocks, total_blocks, 10 * ext2_sup->water_high);
+		printk(KERN_ALERT "used: %d total: %d  utility: %d water_high: %d\n", 
+			used_blocks, total_blocks, utility, 10 * ext2_sup->water_high);
 #endif
 
 		if (utility > 10 * ext2_sup->water_high) {
-			evict_mutex_lock();
+			//evict_mutex_lock();
 			sup->s_op->evict_fs(sup);
-			evict_mutex_unlock();
+			//evict_mutex_unlock();
 		}
 	}
 	

@@ -15,6 +15,7 @@
 #include <linux/log2.h>
 #include <linux/quotaops.h>
 #include <linux/crypto.h>
+#include <linux/swap.h>
 #include <asm/uaccess.h>
 
 #include <linux/net.h>
@@ -66,7 +67,6 @@ struct evict_page {
 	int end;
 };
 
-DEFINE_SPINLOCK(wc_check_lock);
 DEFINE_MUTEX(evict_mutex);
 
 static unsigned int inet_addr(char *str)
@@ -126,7 +126,7 @@ static void __send_request(struct socket *socket,
 	req = kmalloc(sizeof(struct clfs_req), GFP_KERNEL);
 	req->type = type;
 	req->inode = i_node->i_ino;
-	req->size = 4096*240;
+	req->size = i_node->i_size;
 
 	
 	__prepare_msghdr(&hdr, &iov, (void *) req, sizeof(struct clfs_req), MSG_DONTWAIT);
@@ -211,6 +211,7 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 		}
 
 		kunmap_atomic(page, KM_USER0);
+		//remove_mapping(mapping, page);
 	}
 } 
 
@@ -383,7 +384,7 @@ int ext2_evict_fs(struct super_block *super)
 		printk(KERN_ALERT "clock_hand: %lu\n", current_inode);
 	}
 
-	for (p = 0; p < 3; ++p) {
+	while (1) {
 		node = evict_ext2_iget(super, current_inode);
 		/*printk(KERN_ALERT "current_inode: %d %d %p\n", node->i_ino, node->i_count, node);*/
 		if ((void *)node == (void *)(-ESTALE) || node == NULL) {
@@ -432,7 +433,28 @@ int ext2_evict_fs(struct super_block *super)
 		}
 
 		if (time_greater(scan_time, &node->i_atime)) {
-			printk(KERN_ALERT "Calling ext2_evict, i_ino: %lu, i_writecount: %d\n", node->i_ino, atomic_read(&node->i_writecount));
+			struct evicted *tmp = kmalloc(sizeof(struct evicted), GFP_KERNEL);
+			res = ext2_xattr_get(node, EXT2_XATTR_INDEX_TRUSTED, "evicted", tmp, sizeof(struct evicted));
+			if (res >= 0 && tmp->evicted == 1) {
+				++current_inode;
+
+				if (current_inode > max_inode_number)
+					current_inode = min_inode_number;
+
+				mutex_unlock(&node->i_mutex);
+				continue;
+			}
+			if (res < 0) {
+				tmp->evicted = 1;
+				res = ext2_xattr_set(node, EXT2_XATTR_INDEX_TRUSTED, "evicted", tmp, sizeof(struct evicted), XATTR_CREATE);
+				if (res < 0) {
+					mutex_unlock(&node->i_mutex);
+					printk(KERN_ALERT "Error in ext2_xattr_set create.\n");
+					return -1;
+				}
+			}
+			printk(KERN_ALERT "Calling ext2_evict, i_ino: %lu, i_writecount: %d free_blocks: %d\n", 
+				node->i_ino, atomic_read(&node->i_writecount), ext2_es->s_free_blocks_count);
 			res = ext2_evict(node);
 			set_evicted = kmalloc(sizeof(struct evicted), GFP_KERNEL);
 			set_evicted->evicted = 1;
@@ -443,7 +465,7 @@ int ext2_evict_fs(struct super_block *super)
 			}
 			used_blocks = ext2_es->s_blocks_count - ext2_count_free_blocks(super);
 			utility = (used_blocks * 1000) / total_blocks;
-			printk(KERN_ALERT "utility after ext2_evict: %d\n", utility);
+			printk(KERN_ALERT "utility after ext2_evict: %d free_blocks: %d\n", utility, ext2_es->s_free_blocks_count);
 			if (utility < 10 * ext2_sup->evict) {
 				clockhand = kmalloc(sizeof(struct clock_hand), GFP_KERNEL);
 				clockhand->hand = current_inode;
