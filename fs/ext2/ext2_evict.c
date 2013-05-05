@@ -33,6 +33,7 @@
 #include "xip.h"
 
 #define d(x) printk(KERN_ALERT "%d\n", x)
+#define test_and_free(x) if(x) kfree(x)
 #define SEND_SIZE 4096
 
 enum clfs_status {
@@ -384,7 +385,6 @@ int ext2_evict_fs(struct super_block *super)
 		mutex_unlock(&root_inode->i_mutex);
 		if (res < 0) {
 			printk(KERN_ALERT "Error in ext2_xattr_set.\n");
-			res = -1;
 			goto out;
 		}
 	} else {
@@ -406,6 +406,7 @@ int ext2_evict_fs(struct super_block *super)
 		getnstimeofday(current_time);
 		res = ext2_xattr_get(node, EXT2_XATTR_INDEX_TRUSTED,
 				     "scantime", scan_time, sizeof(struct timespec));
+
 		if (res < 0)
 			scan_time->tv_sec = scan_time->tv_nsec = 0;
 
@@ -413,7 +414,7 @@ int ext2_evict_fs(struct super_block *super)
 		set_time->tv_nsec = current_time->tv_nsec;
 
 		res = ext2_xattr_set(node, EXT2_XATTR_INDEX_TRUSTED,
-				     "scantime", set_time, sizeof(struct timespec), XATTR_CREATE);
+				     "scantime", set_time, sizeof(struct timespec), 0);
 		if (res < 0) {
 			mutex_unlock(&node->i_mutex);
 			printk(KERN_ALERT "Error in ext2_xattr_set create.\n");
@@ -453,7 +454,7 @@ int ext2_evict_fs(struct super_block *super)
 			if (utility < 10 * ext2_sup->evict) {
 				clockhand->hand = current_inode;
 				res = ext2_xattr_set(root_inode, EXT2_XATTR_INDEX_TRUSTED,
-						     "clockhand", clockhand, sizeof(struct clock_hand), XATTR_REPLACE);
+						     "clockhand", clockhand, sizeof(struct clock_hand), 0);
 				if (res < 0)
 					printk(KERN_ALERT "Error in ext2_xattr_set replace.\n");
 				printk(KERN_ALERT "ext2_evict_fs return.\n");
@@ -469,11 +470,11 @@ int ext2_evict_fs(struct super_block *super)
 		continue;
 	}
 out:
-	kfree(scan_time);
-	kfree(set_time);
-	kfree(current_time);
-	kfree(clockhand);
-	kfree(set_evicted);
-	kfree(scan_evicted);
+	test_and_free(scan_time);
+	test_and_free(set_time);
+	test_and_free(current_time);
+	test_and_free(clockhand);
+	test_and_free(set_evicted);
+	test_and_free(scan_evicted);
 	return res;
 }
