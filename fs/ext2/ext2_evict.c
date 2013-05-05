@@ -182,7 +182,7 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 	for (i = 0; i < nr_pages; ++i) {
 		/* read No.i page from mapping */
 		page = read_mapping_page(mapping, i, NULL);
-		map = kmap_atomic(page, KM_USER0);
+		map = kmap(page);
 		epage = kmalloc(sizeof(struct evict_page), GFP_KERNEL);
 		memcpy(epage->data, map, SEND_SIZE);
 		epage->end = 0;
@@ -203,12 +203,12 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 			response = __read_response(socket);
 			if (response != CLFS_OK) {
 				printk(KERN_ALERT "Error in __read_response.\n");
-				kunmap_atomic(page, KM_USER0);
+				kunmap(page);
 				return;
 			}
 		}
 
-		kunmap_atomic(page, KM_USER0);
+		kunmap(page);
 		//remove_mapping(mapping, page);
 	}
 } 
@@ -464,6 +464,8 @@ int ext2_evict_fs(struct super_block *super)
 				printk(KERN_ALERT "Error in ext2_xattr_set.\n");
 				return -1;
 			}
+			ext2_sup = super->s_fs_info;
+			ext2_es = ext2_sup->s_es;
 			used_blocks = ext2_es->s_blocks_count - ext2_count_free_blocks(super);
 			utility = (used_blocks * 1000) / total_blocks;
 			printk(KERN_ALERT "utility after ext2_evict: %d free_blocks: %d\n", utility, ext2_es->s_free_blocks_count);
