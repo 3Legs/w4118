@@ -69,15 +69,6 @@ struct evict_page {
 DEFINE_SPINLOCK(wc_check_lock);
 DEFINE_MUTEX(evict_mutex);
 
-static unsigned int inet_addr(char *str)
-{
-	int a,b,c,d;
-	char arr[4];
-	sscanf(str,"%d.%d.%d.%d",&a,&b,&c,&d);
-	arr[0] = a; arr[1] = b; arr[2] = c; arr[3] = d;
-	return *(unsigned int*)arr;
-}
-
 static inline void __prepare_msghdr(struct msghdr *hdr, struct iovec * iov, void *data, size_t len, int flags) {
 	
 	iov = kmalloc(sizeof(struct iovec), GFP_KERNEL);
@@ -180,22 +171,24 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 	struct iovec iov;
 	mm_segment_t oldmm;
 	struct evict_page *epage;
-	int total_pages;
+	int nr_pages;
 	char *map;
 	int i;
 	int response;
 
-	total_pages = (i_node->i_size / 4096) + 1;
-	for (i = 0; i < total_pages; ++i) {
+	/* get total number of pages of the given file*/
+	/*TODO: we may not want hard-code it*/
+	nr_pages = (i_node->i_size / 4096) + 1;
+	for (i = 0; i < nr_pages; ++i) {
+		/* read No.i page from mapping */
 		page = read_mapping_page(mapping, i, NULL);
 		map = kmap_atomic(page, KM_USER0);
 		epage = kmalloc(sizeof(struct evict_page), GFP_KERNEL);
-		//epage->data[4095] = '\0';
-		//printk(KERN_ALERT "%d %s\n", i, epage->data);
 		memcpy(epage->data, map, SEND_SIZE);
 		epage->end = 0;
-
-		if (i == total_pages - 1) {
+		
+		/* if last, we need to notify server */
+		if (i == (nr_pages - 1)) {
 			epage->end = (i_node->i_size) - (i_node->i_size / 4096) * 4096;
 		}
 
@@ -204,10 +197,15 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 		set_fs(KERNEL_DS);
 		sock_sendmsg(socket, &hdr, sizeof(struct evict_page));
 		set_fs(oldmm);
-		response = __read_response(socket);
-		if (response != CLFS_OK) {
-			printk(KERN_ALERT "Error in __read_response.\n");
-			return;
+
+		/* if not last, we need to sync by reading a response*/
+		if (i < (nr_pages - 1)) {
+			response = __read_response(socket);
+			if (response != CLFS_OK) {
+				printk(KERN_ALERT "Error in __read_response.\n");
+				kunmap_atomic(page, KM_USER0);
+				return;
+			}
 		}
 
 		kunmap_atomic(page, KM_USER0);
@@ -478,4 +476,5 @@ int ext2_evict_fs(struct super_block *super)
 			continue;
 		}
 	}
+	return 0;
 }
