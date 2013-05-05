@@ -381,7 +381,7 @@ int ext2_evict_fs(struct super_block *super)
 		printk(KERN_ALERT "min: %lu max: %lu\n", min_inode_number, max_inode_number);
 
 		res = ext2_xattr_set(root_inode, EXT2_XATTR_INDEX_TRUSTED,
-				     "clockhand", clockhand, sizeof(struct clock_hand), XATTR_CREATE);
+				     "clockhand", clockhand, sizeof(struct clock_hand), 0);
 		mutex_unlock(&root_inode->i_mutex);
 		if (res < 0) {
 			printk(KERN_ALERT "Error in ext2_xattr_set.\n");
@@ -395,8 +395,9 @@ int ext2_evict_fs(struct super_block *super)
 
 	while (1) {
 		node = evict_ext2_iget(super, current_inode);
-
+		d(1);
 		mutex_lock(&node->i_mutex);
+		d(2);
 		if ((void *)node == (void *)(-ESTALE) || node == NULL)
 			goto continue_loop;
 		
