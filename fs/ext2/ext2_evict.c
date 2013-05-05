@@ -32,6 +32,7 @@
 #include "xip.h"
 
 #define d(x) printk(KERN_ALERT "%d\n", x)
+#define SEND_SIZE 4096
 
 enum clfs_status {
 	CLFS_OK = 0,            /* Success */
@@ -58,6 +59,11 @@ struct clock_hand {
 
 struct evicted {
 	long evicted;
+};
+
+struct evict_page {
+	char data[SEND_SIZE];
+	int end;
 };
 
 DEFINE_SPINLOCK(wc_check_lock);
@@ -120,7 +126,8 @@ static void __send_request(struct socket *socket,
 	req = kmalloc(sizeof(struct clfs_req), GFP_KERNEL);
 	req->type = type;
 	req->inode = i_node->i_ino;
-	req->size = 2 * PAGE_SIZE;
+	req->size = 4096*240;
+
 	
 	__prepare_msghdr(&hdr, &iov, (void *) req, sizeof(struct clfs_req), MSG_DONTWAIT);
 	printk(KERN_ALERT "Req size: %d, Send size %d\n", hdr.msg_iov->iov_len, sizeof(struct clfs_req));
@@ -165,44 +172,47 @@ static int __read_response(struct socket *socket) {
  * 3. send
  * 4. handle local data (delete page cache and reclaim blocks)
  */
+
 static void __send_file_data_to_server(struct socket *socket, struct inode *i_node) {
+	struct address_space *mapping = i_node->i_mapping;
+	struct page *page;
 	struct msghdr hdr;
 	struct iovec iov;
 	mm_segment_t oldmm;
-	char *buf = kmalloc(2*PAGE_SIZE, GFP_KERNEL);
-	char *tmpbuf;
-	
-	struct bio *bio = NULL;
-	unsigned page_idx;
-	sector_t last_block_in_bio = 0;
-	struct buffer_head map_bh;
-	unsigned long first_logical_block = 0;
-	unsigned page_idx;
-	struct page * page;
+	struct evict_page *epage;
+	int total_pages;
+	char *map;
+	int i;
+	int response;
 
-	map_bh.b_state = 0;
-	map_bh.b_size = 0;
+	total_pages = (i_node->i_size / 4096) + 1;
+	for (i = 0; i < total_pages; ++i) {
+		page = read_mapping_page(mapping, i, NULL);
+		map = kmap_atomic(page, KM_USER0);
+		epage = kmalloc(sizeof(struct evict_page), GFP_KERNEL);
+		//epage->data[4095] = '\0';
+		//printk(KERN_ALERT "%d %s\n", i, epage->data);
+		memcpy(epage->data, map, SEND_SIZE);
+		epage->end = 0;
 
-	for (page_idx = 0; page_idx < 2 ; ++page_idx) {
-		bio = do_mpage_readpage(bio, page,
-                                         2 - page_idx,
-                                         &last_block_in_bio, &map_bh,
-                                         &first_logical_block,
-                                         ext2_get_block);
-		tmpbuf = kmap_atomic(page, KM_USER0);
-		memcpy(buf+page_idx * PAGE_SIZE, tmpbuf, PAGE_SIZE);
-		
+		if (i == total_pages - 1) {
+			epage->end = (i_node->i_size) - (i_node->i_size / 4096) * 4096;
+		}
+
+		__prepare_msghdr(&hdr, &iov, epage, sizeof(struct evict_page), MSG_DONTWAIT);
+		oldmm = get_fs();
+		set_fs(KERNEL_DS);
+		sock_sendmsg(socket, &hdr, sizeof(struct evict_page));
+		set_fs(oldmm);
+		response = __read_response(socket);
+		if (response != CLFS_OK) {
+			printk(KERN_ALERT "Error in __read_response.\n");
+			return;
+		}
+
+		kunmap_atomic(page, KM_USER0);
 	}
-
-	__prepare_msghdr(&hdr, &iov, (void *) buf, 2 * PAGE_SIZE, MSG_DONTWAIT);
-	oldmm = get_fs();
-	set_fs(KERNEL_DS);
-	sock_sendmsg(socket, &hdr, 2 * PAGE_SIZE);
-	set_fs(oldmm);
-
-	return;
-}
-
+} 
 
 /*
  * read file data from a socket
@@ -210,6 +220,7 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
  * 2. get the hash code and check authentication
  * 3. write data to file
  */
+
 static int __read_file_data_from_server(struct socket *socket, struct inode *i_node) {
 	return 0;
 }
@@ -254,6 +265,8 @@ int ext2_evict(struct inode *i_node) {
 			/* clean up local file here */
 		}
 	}
+
+	ext2_truncate(i_node);
 evict_release_out:
 	sock_release(socket);
 evict_out:
@@ -342,6 +355,7 @@ int ext2_evict_fs(struct super_block *super)
 	long max_inode_number = (long) le32_to_cpu(ext2_es->s_inodes_count);
 	long current_inode;
 	int res;
+	int p;
 
 	printk(KERN_ALERT "Calling ext2_evict_fs.\n");
 
@@ -369,7 +383,7 @@ int ext2_evict_fs(struct super_block *super)
 		printk(KERN_ALERT "clock_hand: %lu\n", current_inode);
 	}
 
-	while (1) {
+	for (p = 0; p < 3; ++p) {
 		node = evict_ext2_iget(super, current_inode);
 		/*printk(KERN_ALERT "current_inode: %d %d %p\n", node->i_ino, node->i_count, node);*/
 		if ((void *)node == (void *)(-ESTALE) || node == NULL) {
@@ -429,7 +443,7 @@ int ext2_evict_fs(struct super_block *super)
 			}
 			used_blocks = ext2_es->s_blocks_count - ext2_count_free_blocks(super);
 			utility = (used_blocks * 1000) / total_blocks;
-
+			printk(KERN_ALERT "utility after ext2_evict: %d\n", utility);
 			if (utility < 10 * ext2_sup->evict) {
 				clockhand = kmalloc(sizeof(struct clock_hand), GFP_KERNEL);
 				clockhand->hand = current_inode;

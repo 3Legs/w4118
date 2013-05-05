@@ -209,6 +209,11 @@ fail:
 	return ERR_PTR(-EIO);
 }
 
+struct page *evict_get_page(struct inode *inode, unsigned long num)
+{
+	return ext2_get_page(inode, num, 0);
+}
+
 /*
  * NOTE! unlike strncmp, ext2_match returns 1 for success, 0 for failure.
  *

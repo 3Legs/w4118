@@ -158,6 +158,7 @@ extern void ext2_write_super (struct super_block *);
 extern int ext2_evict(struct inode *i_node);
 extern int ext2_fetch(struct inode *i_node);
 extern int ext2_evict_fs(struct super_block *super);
+extern struct page *evict_get_page(struct inode *inode, unsigned long num);
 extern void evict_mutex_lock(void);
 extern void evict_mutex_unlock(void);
 
