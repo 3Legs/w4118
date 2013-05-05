@@ -395,15 +395,13 @@ int ext2_evict_fs(struct super_block *super)
 
 	while (1) {
 		node = evict_ext2_iget(super, current_inode);
-		d(1);
-		mutex_lock(&node->i_mutex);
-		d(2);
 		if ((void *)node == (void *)(-ESTALE) || node == NULL)
-			goto continue_loop;
+			goto continue_loop_with_no_lock;
 		
 		if (!S_ISREG(node->i_mode) || atomic_read(&node->i_writecount) > 0)
-			goto continue_loop;
+			goto continue_loop_with_no_lock;
 
+		mutex_lock(&node->i_mutex);
 		getnstimeofday(current_time);
 		res = ext2_xattr_get(node, EXT2_XATTR_INDEX_TRUSTED,
 				     "scantime", scan_time, sizeof(struct timespec));
@@ -464,10 +462,11 @@ int ext2_evict_fs(struct super_block *super)
 			}
 		} 
 	continue_loop:
+		mutex_unlock(&node->i_mutex);
+	continue_loop_with_no_lock:
 		++current_inode;
 		if (current_inode > max_inode_number)
 			current_inode = min_inode_number;
-		mutex_unlock(&node->i_mutex);
 		continue;
 	}
 out:
