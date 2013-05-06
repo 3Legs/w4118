@@ -255,10 +255,18 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 			goto read_out_with_no_lock;
 			
 		}
-		
+		printk(KERN_ALERT "Get a page, end: %d", epage->end);
+
 		if (epage->end == -1) {
 			r = (total_len == i_node->i_size)?CLFS_OK:CLFS_ERROR;
 			goto read_out_with_no_lock;
+		}
+
+		if (epage->end) {
+			buflen = epage->end;
+		} else {
+			buflen = SEND_SIZE;
+			__send_response(socket, CLFS_NEXT);
 		}
 
 		page = find_or_create_page(mapping, i, GFP_KERNEL);
@@ -270,13 +278,6 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 
 		/* lock_page(page); */
 		map = kmap(page);
-		
-		if (epage->end) {
-			buflen = epage->end;
-		} else {
-			buflen = SEND_SIZE;
-			__send_response(socket, CLFS_NEXT);
-		}
 
 		memcpy(map, epage->data, buflen); 
 		total_len += buflen;
