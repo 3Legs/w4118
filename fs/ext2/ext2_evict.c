@@ -239,7 +239,7 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 
 	nr_pages = (i_node->i_size / SEND_SIZE) + 1;
 	while (1) {
-		if (i >= nr_pages) {
+		if (i > nr_pages) {
 			printk(KERN_ALERT "Page number overflow %d\n", i);
 			r = CLFS_ERROR;
 			goto read_out_with_no_lock;
