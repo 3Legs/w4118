@@ -41,7 +41,8 @@ enum clfs_status {
 	CLFS_INVAL = EINVAL,    /* Invalid address */
 	CLFS_ACCESS = EACCES,   /* Could not read/write file */
 	CLFS_ERROR,             /* Other errors */
-	CLFS_NEXT               /* Next data packet please */
+	CLFS_NEXT,              /* Next data packet please */
+	CLFS_END                /* No more, please */
 };
 
 enum clfs_type {
@@ -200,22 +201,19 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 		set_fs(KERNEL_DS);
 		sock_sendmsg(socket, &hdr, sizeof(struct evict_page));
 		set_fs(oldmm);
-
-		/* if not last, we need to sync by reading a response*/
-		if (i < (nr_pages - 1)) {
-			response = __read_response(socket);
-			if (response != CLFS_NEXT) {
-				printk(KERN_ALERT "Error in __read_response.\n");
-				kunmap(page);
-				return;
-			}
-		}
-
 		kunmap(page);
 		remove_from_page_cache(page);
 		page_cache_release(page);
 
 		unlock_page(page);
+
+		/* if not last, we need to sync by reading a response*/
+		response = __read_response(socket);
+		if (response == CLFS_END) {
+			printk(KERN_ALERT "All pages sent, %d in total\n", i);
+			return;
+		}
+
 	}
 } 
 
@@ -240,11 +238,11 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 
 	nr_pages = (i_node->i_size / SEND_SIZE) + 1;
 	while (1) {
-		/* if (i > nr_pages) { */
-		/* 	printk(KERN_ALERT "Page number overflow %d\n", i); */
-		/* 	r = CLFS_ERROR; */
-		/* 	goto read_out_with_no_lock; */
-		/* } */
+		if (i > nr_pages) {
+			printk(KERN_ALERT "Page number overflow %d\n", i);
+			r = CLFS_ERROR;
+			goto read_out_with_no_lock;
+		}
 
 		epage = kmalloc(sizeof(struct evict_page), GFP_KERNEL);
 		__prepare_msghdr(&hdr, &iov, epage, sizeof(struct evict_page), MSG_WAITALL);
@@ -252,23 +250,26 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 		if (len < sizeof(struct evict_page)) {
 			printk(KERN_ALERT "Receving error\n");
 			r = CLFS_ERROR;
+			__send_response(socket, CLFS_END);
 			goto read_out_with_no_lock;
 			
 		}
 		printk(KERN_ALERT "Receive page %d with end: %d\n", i, epage->end);
 
 		if (epage->end == -1) {
-			r = (total_len == i_node->i_size)?CLFS_OK:CLFS_ERROR;
-			goto read_out_with_no_lock_len_err;
+			__send_response(socket, CLFS_END);
+			goto read_out_regular_out;
 		}
 
 		if (epage->end < 0) {
+			printk(KERN_ALERT "Something went wrong here\n");
 			r = CLFS_ERROR;
 			goto read_out_with_no_lock;
 		}
 
 		if (epage->end) {
 			buflen = epage->end;
+			__send_response(socket, CLFS_END);
 		} else {
 			buflen = SEND_SIZE;
 			__send_response(socket, CLFS_NEXT);
@@ -292,15 +293,18 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 		kunmap(page);
 
 		/* if last, we are done */
-		if (epage->end) {
-			r = (total_len == i_node->i_size)?CLFS_OK:CLFS_ERROR;
-			goto read_out_with_no_lock;
-		}
+		if (epage->end)
+			goto read_out_regular_out;
+
 		printk(KERN_ALERT "Loop end after storing page %d\n", i);
 		++i;
 	}
-read_out_with_no_lock_len_err:
-	printk(KERN_ALERT "Receive file len error\n");
+read_out_regular_out:
+	r = CLFS_OK;
+	if (total_len != i_node->i_size) {
+		printk(KERN_ALERT "File length error\n");
+		r = CLFS_ERROR;
+	}
 read_out_with_no_lock:
 	return r;
 }
