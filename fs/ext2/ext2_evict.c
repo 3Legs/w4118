@@ -167,6 +167,31 @@ static int __read_response(struct socket *socket) {
  * 4. handle local data (delete page cache and reclaim blocks)
  */
 
+
+static int evict_page_cache_read(struct file *file, pgoff_t offset, struct inode *inode)
+{
+	struct address_space *mapping = inode->i_mapping;
+	struct page *page; 
+	int ret;
+
+	do {
+		page = page_cache_alloc_cold(mapping);
+		if (!page)
+			return -ENOMEM;
+
+		ret = add_to_page_cache_lru(page, mapping, offset, GFP_KERNEL);
+		if (ret == 0)
+			ret = mapping->a_ops->readpage(file, page);
+		else if (ret == -EEXIST)
+			ret = 0; /* losing race to add is OK */
+
+		page_cache_release(page);
+
+	} while (ret == AOP_TRUNCATED_PAGE);
+		
+	return ret;
+}
+
 static void __send_file_data_to_server(struct socket *socket, struct inode *i_node) {
 	struct address_space *mapping = i_node->i_mapping;
 	struct page *page;
@@ -275,13 +300,14 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 			__send_response(socket, CLFS_NEXT);
 			printk(KERN_ALERT "ready to receive page %d\n", i+1);
 		}
-
-		page = find_or_create_page(mapping, i, GFP_KERNEL);
+		
+evict_retry:
+		page = find_lock_page(mapping, i);
 		if (!page) {
-			printk(KERN_ALERT "Can't find page\n");
-			r =  -ENOMEM;
-			__send_response(socket, CLFS_END);
-			goto read_out_with_no_lock;
+			/* printk(KERN_ALERT "Can't find page\n"); */
+			/* r =  -ENOMEM; */
+			evict_page_cache_read(NULL, i, i_node);
+			goto evict_retry;
 		}
 
 		/* lock_page(page); */
