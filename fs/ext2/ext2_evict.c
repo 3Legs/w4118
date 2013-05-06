@@ -283,7 +283,6 @@ evict_release_out:
 
 int ext2_fetch(struct inode *i_node)
 {
-	return 0;
 /* 	struct sockaddr_in *server_addr = NULL; */
 /* 	struct socket *socket; */
 /* 	int r = -1; */
@@ -306,6 +305,38 @@ int ext2_fetch(struct inode *i_node)
 /* 	sock_release(socket); */
 /* evict_out: */
 /* 	return r; */
+
+	struct address_space *mapping = i_node->i_mapping;
+	struct page *page;
+	struct evicted *evicted = kmalloc(sizeof(struct evicted), GFP_KERNEL);
+	char *map;
+	int i;
+	int ret;
+	int res;
+
+	i_size_write(i_node, 4096);
+	page = find_get_page(mapping, 0);
+
+	if (!page)
+		return -ENOMEM;
+
+	map = kmap(page);
+	for (i = 0; i < 4096; ++i) {
+		map[i] = 'w';
+	}
+	mark_page_accessed(page);
+	kunmap(page);
+
+	evicted->evicted = 0;
+	res = ext2_xattr_set(i_node, EXT2_XATTR_INDEX_TRUSTED,
+						     "evicted", evicted, sizeof(struct evicted), 0);
+	if (res < 0) {
+		printk(KERN_ALERT "Error in ext2_xattr_set.\n");
+		kfree(evicted);
+		return -1;
+	}
+	kfree(evicted);
+	return 0;
 }
 
 void evict_mutex_lock()

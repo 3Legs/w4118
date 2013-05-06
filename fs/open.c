@@ -1185,6 +1185,9 @@ int generic_file_open(struct inode * inode, struct file * filp)
 
 	if (res >= 0 && evicted->evicted) {
 		res = ext2_fetch(inode);
+		if (!res) {
+			printk(KERN_ALERT "Successful return from ext2_fetch.\n");
+		}
 	}
 	kfree(evicted);
 	
