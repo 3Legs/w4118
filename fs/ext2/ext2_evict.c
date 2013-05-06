@@ -255,11 +255,16 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 			goto read_out_with_no_lock;
 			
 		}
-		printk(KERN_ALERT "Get a page, end: %d\n", epage->end);
+		printk(KERN_ALERT "Receive page %d with end: %d\n", i, epage->end);
 
 		if (epage->end == -1) {
 			r = (total_len == i_node->i_size)?CLFS_OK:CLFS_ERROR;
 			goto read_out_with_no_lock_len_err;
+		}
+
+		if (epage->end < 0) {
+			r = CLFS_ERROR;
+			goto read_out_with_no_lock;
 		}
 
 		if (epage->end) {
