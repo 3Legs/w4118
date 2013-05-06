@@ -246,8 +246,8 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 		}
 
 		epage = kmalloc(sizeof(struct evict_page), GFP_KERNEL);
-		__prepare_msghdr(&hdr, &iov, epage, sizeof(struct evict_page), MSG_DONTWAIT);
-		len = sock_recvmsg(socket, &hdr, sizeof(struct evict_page), MSG_DONTWAIT);
+		__prepare_msghdr(&hdr, &iov, epage, sizeof(struct evict_page), MSG_WAITALL);
+		len = sock_recvmsg(socket, &hdr, sizeof(struct evict_page), MSG_WAITALL);
 		if (len < sizeof(struct evict_page)) {
 			printk(KERN_ALERT "Receving error\n");
 			r = CLFS_ERROR;
