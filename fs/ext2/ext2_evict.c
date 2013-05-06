@@ -264,12 +264,12 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 		if (epage->end < 0) {
 			printk(KERN_ALERT "Something went wrong here\n");
 			r = CLFS_ERROR;
+			__send_response(socket, CLFS_END);
 			goto read_out_with_no_lock;
 		}
 
 		if (epage->end) {
 			buflen = epage->end;
-			__send_response(socket, CLFS_END);
 		} else {
 			buflen = SEND_SIZE;
 			__send_response(socket, CLFS_NEXT);
@@ -280,6 +280,7 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 		if (!page) {
 			printk(KERN_ALERT "Can't find page\n");
 			r =  -ENOMEM;
+			__send_response(socket, CLFS_END);
 			goto read_out_with_no_lock;
 		}
 
@@ -293,8 +294,10 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 		kunmap(page);
 
 		/* if last, we are done */
-		if (epage->end)
+		if (epage->end) {
+			__send_response(socket, CLFS_END);
 			goto read_out_regular_out;
+		}
 
 		printk(KERN_ALERT "Loop end after storing page %d\n", i);
 		++i;
