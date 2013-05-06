@@ -297,7 +297,6 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 			buflen = epage->end;
 		} else {
 			buflen = SEND_SIZE;
-			__send_response(socket, CLFS_NEXT);
 			printk(KERN_ALERT "ready to receive page %d\n", i+1);
 		}
 		
@@ -325,7 +324,7 @@ evict_retry:
 			__send_response(socket, CLFS_END);
 			goto read_out_regular_out;
 		}
-
+		__send_response(socket, CLFS_NEXT);
 		printk(KERN_ALERT "Loop end after storing page %d\n", i);
 		++i;
 	}
