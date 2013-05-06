@@ -303,7 +303,6 @@ int ext2_evict(struct inode *i_node) {
 
 	printk(KERN_ALERT "Socket created, %d\n", r);
 
-	/* memset(server_addr, 0, sizeof(struct sockaddr_in)); */
 	server_addr = kmalloc(sizeof(struct sockaddr_in), GFP_KERNEL);
 	if (!server_addr) {
 		printk(KERN_ALERT "kmalloc error \n");
@@ -366,7 +365,7 @@ int ext2_fetch(struct inode *i_node)
 	__prepare_addr(server_addr, i_node);
 	r = __connect_socket(socket, server_addr, i_node);
 
-	if (!r) {
+	if (r) {
 		printk(KERN_ALERT "Socket create error: %d\n", r);
 		r = -1;
 		goto fetch_out;
