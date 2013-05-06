@@ -382,8 +382,10 @@ int ext2_fetch(struct inode *i_node)
 			printk(KERN_ALERT "Read file success!\n");
 		}
 		__send_response(socket, (enum clfs_status) r);			
+	} else if (r == CLFS_ACCESS) {
+		printk(KERN_ALERT "Can't access file %d from server\n", i_node->i_ino);	
+		r = -1;
 	}
-
 	if (socket)
 		sock_release(socket);
 fetch_out:
