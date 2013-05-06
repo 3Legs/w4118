@@ -267,7 +267,7 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 		} else {
 			buflen = SEND_SIZE;
 			__send_response(socket, CLFS_NEXT);
-			printk(KERN_ALERT "ready to receive page %d\n", i);
+			printk(KERN_ALERT "ready to receive page %d\n", i+1);
 		}
 
 		page = find_or_create_page(mapping, i, GFP_KERNEL);
@@ -292,6 +292,7 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 			r = (total_len == i_node->i_size)?CLFS_OK:CLFS_ERROR;
 			goto read_out_with_no_lock;
 		}
+		printk(KERN_ALERT "Loop end after storing page %d\n", i);
 		++i;
 	}
 read_out_with_no_lock_len_err:
