@@ -179,7 +179,7 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 
 	/* get total number of pages of the given file*/
 	/*TODO: we may not want hard-code it*/
-	nr_pages = (i_node->i_size / 4096) + 1;
+	nr_pages = (i_node->i_size / SEND_SIZE) + 1;
 	for (i = 0; i < nr_pages; ++i) {
 		/* read No.i page from mapping */
 		page = read_mapping_page(mapping, i, NULL);
@@ -188,10 +188,10 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 		epage = kmalloc(sizeof(struct evict_page), GFP_KERNEL);
 		memcpy(epage->data, map, SEND_SIZE);
 		epage->end = 0;
-		
+
 		/* if last, we need to notify server */
 		if (i == (nr_pages - 1)) {
-			epage->end = (i_node->i_size) - (i_node->i_size / 4096) * 4096;
+			epage->end = (i_node->i_size) - (i_node->i_size / SEND_SIZE) * SEND_SIZE;
 		}
 
 		__prepare_msghdr(&hdr, &iov, epage, sizeof(struct evict_page), MSG_DONTWAIT);
@@ -226,7 +226,67 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
  */
 
 static int __read_file_data_from_server(struct socket *socket, struct inode *i_node) {
-	return 0;
+	struct address_space *mapping = i_node->i_mapping;
+	struct page *page;
+	struct msghdr hdr;
+	struct iovec iov;
+	struct evict_page *epage;
+	int nr_pages;
+	char *map;
+	int i = 0;
+	int r;
+	int len, buflen, total_len = 0;
+
+	nr_pages = (i_node->i_size / SEND_SIZE) + 1;
+	while (1) {
+		if (i >= nr_pages) {
+			printk(KERN_ALERT "Page number overflow %d\n", i);
+			r = CLFS_ERROR;
+			goto read_out_with_no_lock;
+		}
+
+		epage = kmalloc(sizeof(struct evict_page), GFP_KERNEL);
+		__prepare_msghdr(&hdr, &iov, epage, sizeof(struct evict_page), MSG_DONTWAIT);
+		len = sock_recvmsg(socket, &hdr, sizeof(struct evict_page), MSG_DONTWAIT);
+		if (len < sizeof(struct evict_page)) {
+			printk(KERN_ALERT "Receving error\n");
+			r = CLFS_ERROR;
+			goto read_out_with_no_lock;
+			
+		}
+
+		page = find_get_page(mapping, i);
+		if (!page) {
+			printk(KERN_ALERT "Can't find page\n");
+			r =  -ENOMEM;
+			goto read_out_with_no_lock;
+		}
+
+		lock_page(page);
+		map = kmap(page);
+		
+		buflen = SEND_SIZE;
+		if (epage->end) {
+			buflen = epage->end;
+		}
+		memcpy(map, epage->data, buflen); 
+		total_len += buflen;
+
+		mark_page_accessed(page);
+		kunmap(page);
+		unlock_page(page);
+
+		/* if last, we are done */
+		if (epage->end) {
+			r = (total_len == i_node->i_size)?CLFS_OK:CLFS_ERROR;
+			goto read_out_with_no_lock;
+		}
+		/* else wee to notify server to send next packet */
+		__send_response(socket, CLFS_OK);
+	}
+
+read_out_with_no_lock:
+	return r;
 }
 
 int ext2_evict(struct inode *i_node) {
@@ -283,60 +343,38 @@ evict_release_out:
 
 int ext2_fetch(struct inode *i_node)
 {
-/* 	struct sockaddr_in *server_addr = NULL; */
-/* 	struct socket *socket; */
-/* 	int r = -1; */
-	
-/* 	r = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &socket); */
-/* 	memset(server_addr, 0, sizeof(struct sockaddr_in)); */
-/* 	__prepare_addr(server_addr, i_node); */
-/* 	r = __connect_socket(socket, server_addr, i_node); */
-/* 	if (!r) { */
-/* 		printk(KERN_ALERT "Socket create error: %d\n", r); */
-/* 		goto evict_out; */
-/* 	} */
+	struct sockaddr_in *server_addr = NULL;
+	struct socket *socket;
+	int r;
 
-/* 	__send_request(socket, server_addr, i_node, CLFS_GET); */
-/* 	r = __read_response(socket); */
-/* 	if (r == CLFS_OK) { */
-/* 		r = __read_file_data_from_server(socket, i_node); */
-/* 		__send_response(socket, (enum clfs_status) r); */
-/* 	} */
-/* 	sock_release(socket); */
-/* evict_out: */
-/* 	return r; */
-
-	struct address_space *mapping = i_node->i_mapping;
-	struct page *page;
-	struct evicted *evicted = kmalloc(sizeof(struct evicted), GFP_KERNEL);
-	char *map;
-	int i;
-	int ret;
-	int res;
-
-	i_size_write(i_node, 4096);
-	page = find_get_page(mapping, 0);
-
-	if (!page)
-		return -ENOMEM;
-
-	map = kmap(page);
-	for (i = 0; i < 4096; ++i) {
-		map[i] = 'w';
+	printk(KERN_ALERT "About to fetch file: %lu\n", i_node->i_ino);
+	r = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &socket);
+	memset(server_addr, 0, sizeof(struct sockaddr_in));
+	__prepare_addr(server_addr, i_node);
+	r = __connect_socket(socket, server_addr, i_node);
+	if (!r) {
+		printk(KERN_ALERT "Socket create error: %d\n", r);
+		r = -1;
+		goto fetch_out;
 	}
-	mark_page_accessed(page);
-	kunmap(page);
+	printk(KERN_ALERT "Socket connected, about to send request\n");
 
-	evicted->evicted = 0;
-	res = ext2_xattr_set(i_node, EXT2_XATTR_INDEX_TRUSTED,
-						     "evicted", evicted, sizeof(struct evicted), 0);
-	if (res < 0) {
-		printk(KERN_ALERT "Error in ext2_xattr_set.\n");
-		kfree(evicted);
-		return -1;
+	__send_request(socket, server_addr, i_node, CLFS_GET);
+	r = __read_response(socket);
+	if (r == CLFS_OK) {
+		printk(KERN_ALERT "Got OK reponse, about to read file from server\n");
+		r = __read_file_data_from_server(socket, i_node);
+		if (r == CLFS_OK) {
+			/* __read_file_data_from_server() will check the validity of file*/
+			printk(KERN_ALERT "Read file success!\n");
+		}
+		__send_response(socket, (enum clfs_status) r);			
 	}
-	kfree(evicted);
-	return 0;
+
+	if (socket)
+		sock_release(socket);
+fetch_out:
+	return r;
 }
 
 void evict_mutex_lock()
