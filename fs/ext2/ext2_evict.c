@@ -131,15 +131,15 @@ static void __send_request(struct socket *socket,
 }
 
 static void __send_response(struct socket *socket, enum clfs_status res) {
-	int response = (int)res;
+	enum clfs_status response = res;
 	struct msghdr hdr;
 	struct iovec iov;
 	mm_segment_t oldmm;
 
-	__prepare_msghdr(&hdr, &iov, (void *) &response, sizeof(int), MSG_DONTWAIT);
+	__prepare_msghdr(&hdr, &iov, (void *) &response, sizeof(enum clfs_status), MSG_DONTWAIT);
 	oldmm = get_fs(); 
 	set_fs(KERNEL_DS);
-	sock_sendmsg(socket, &hdr, sizeof(int));
+	sock_sendmsg(socket, &hdr, sizeof(enum clfs_status));
 	set_fs(oldmm);
 }
 
@@ -255,11 +255,11 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 			goto read_out_with_no_lock;
 			
 		}
-		printk(KERN_ALERT "Get a page, end: %d", epage->end);
+		printk(KERN_ALERT "Get a page, end: %d\n", epage->end);
 
 		if (epage->end == -1) {
 			r = (total_len == i_node->i_size)?CLFS_OK:CLFS_ERROR;
-			goto read_out_with_no_lock;
+			goto read_out_with_no_lock_len_err;
 		}
 
 		if (epage->end) {
@@ -267,6 +267,7 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 		} else {
 			buflen = SEND_SIZE;
 			__send_response(socket, CLFS_NEXT);
+			printk(KERN_ALERT "ready to receive page %d\n", i);
 		}
 
 		page = find_or_create_page(mapping, i, GFP_KERNEL);
@@ -293,7 +294,8 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 		}
 		++i;
 	}
-
+read_out_with_no_lock_len_err:
+	printk(KERN_ALERT "Receive file len error\n");
 read_out_with_no_lock:
 	return r;
 }
