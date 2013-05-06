@@ -40,7 +40,8 @@ enum clfs_status {
 	CLFS_OK = 0,            /* Success */
 	CLFS_INVAL = EINVAL,    /* Invalid address */
 	CLFS_ACCESS = EACCES,   /* Could not read/write file */
-	CLFS_ERROR              /* Other errors */
+	CLFS_ERROR,             /* Other errors */
+	CLFS_NEXT               /* Next data packet please */
 };
 
 enum clfs_type {
@@ -203,7 +204,7 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 		/* if not last, we need to sync by reading a response*/
 		if (i < (nr_pages - 1)) {
 			response = __read_response(socket);
-			if (response != CLFS_OK) {
+			if (response != CLFS_NEXT) {
 				printk(KERN_ALERT "Error in __read_response.\n");
 				kunmap(page);
 				return;
@@ -270,10 +271,13 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 		/* lock_page(page); */
 		map = kmap(page);
 		
-		buflen = SEND_SIZE;
 		if (epage->end) {
 			buflen = epage->end;
+		} else {
+			buflen = SEND_SIZE;
+			__send_response(socket, CLFS_NEXT);
 		}
+
 		memcpy(map, epage->data, buflen); 
 		total_len += buflen;
 
@@ -286,8 +290,6 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 			r = (total_len == i_node->i_size)?CLFS_OK:CLFS_ERROR;
 			goto read_out_with_no_lock;
 		}
-		/* else wee to notify server to send next packet */
-		__send_response(socket, CLFS_OK);
 		++i;
 	}
 
@@ -388,7 +390,7 @@ int ext2_fetch(struct inode *i_node)
 		}
 		__send_response(socket, (enum clfs_status) r);			
 	} else if (r == CLFS_ACCESS) {
-		printk(KERN_ALERT "Can't access file %d from server\n", i_node->i_ino);	
+		printk(KERN_ALERT "Can't access file %lu from server\n", i_node->i_ino);	
 		r = -1;
 	}
 	if (socket)
