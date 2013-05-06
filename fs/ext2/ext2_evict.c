@@ -270,7 +270,7 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 			printk(KERN_ALERT "ready to receive page %d\n", i+1);
 		}
 
-		page = find_or_create_page(mapping, i, GFP_KERNEL);
+		page = find_get_page(mapping, i);
 		if (!page) {
 			printk(KERN_ALERT "Can't find page\n");
 			r =  -ENOMEM;
@@ -285,7 +285,6 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 
 		mark_page_accessed(page);
 		kunmap(page);
-		unlock_page(page);
 
 		/* if last, we are done */
 		if (epage->end) {
