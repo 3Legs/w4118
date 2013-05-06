@@ -267,7 +267,7 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 			goto read_out_with_no_lock;
 		}
 
-		lock_page(page);
+		/* lock_page(page); */
 		map = kmap(page);
 		
 		buflen = SEND_SIZE;
