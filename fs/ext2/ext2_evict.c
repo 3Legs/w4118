@@ -254,6 +254,11 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 			goto read_out_with_no_lock;
 			
 		}
+		
+		if (epage->end == -1) {
+			r = (total_len == i_node->i_size)?CLFS_OK:CLFS_ERROR;
+			goto read_out_with_no_lock;
+		}
 
 		page = find_get_page(mapping, i);
 		if (!page) {
