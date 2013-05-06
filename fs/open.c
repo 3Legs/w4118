@@ -1178,7 +1178,6 @@ SYSCALL_DEFINE0(vhangup)
 int generic_file_open(struct inode * inode, struct file * filp)
 {
 	int res;
-	int val;
 	struct evicted *evicted = kmalloc(sizeof(struct evicted), GFP_KERNEL);
 	printk(KERN_ALERT "Inode %lu will be opened.\n", inode->i_ino);
 	res = ext2_xattr_get(inode, EXT2_XATTR_INDEX_TRUSTED, "evicted", evicted, sizeof(struct evicted));
@@ -1187,6 +1186,15 @@ int generic_file_open(struct inode * inode, struct file * filp)
 		res = ext2_fetch(inode);
 		if (!res) {
 			printk(KERN_ALERT "Successful return from ext2_fetch.\n");
+			evicted->evicted = 0;
+			res = ext2_xattr_set(inode, EXT2_XATTR_INDEX_TRUSTED, "evicted", evicted, sizeof(struct evicted), 0);
+			if (res < 0) {
+				printk(KERN_ALERT "Error occured in ext2_xattr_set in generic_file_open.\n");
+				return -1;
+			}
+		} else {
+			printk(KERN_ALERT "ext2_fetch failed.\n");
+			return -1;
 		}
 	}
 	kfree(evicted);

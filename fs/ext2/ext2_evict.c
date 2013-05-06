@@ -283,6 +283,7 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 		}
 		/* else wee to notify server to send next packet */
 		__send_response(socket, CLFS_OK);
+		++i;
 	}
 
 read_out_with_no_lock:
@@ -294,6 +295,7 @@ int ext2_evict(struct inode *i_node) {
 	struct sockaddr_in *server_addr = NULL;
 	struct socket *socket;
 	int r = -1;
+	loff_t record_size;
 
 	printk(KERN_ALERT "About to evict file %lu\n", i_node->i_ino);
 
@@ -327,9 +329,12 @@ int ext2_evict(struct inode *i_node) {
 		if (r == CLFS_OK) {
 			printk(KERN_ALERT "Successfully evict file %lu\n", i_node->i_ino);			
 			/* clean up local file here */
-			//vmtruncate(i_node, 0);
+			record_size = i_node->i_size;
+			/* printk(KERN_ALERT "access: %lu %lu\n", i_node->i_atime.tv_sec, i_node->i_atime.tv_nsec); */
 			i_size_write(i_node, 0);
 			ext2_truncate(i_node);
+			i_size_write(i_node, record_size);
+			/* printk(KERN_ALERT "access: %lu %lu\n", i_node->i_atime.tv_sec, i_node->i_atime.tv_nsec); */
 		} else {
 			printk(KERN_ALERT "Evict error %d on file %lu\n", r, i_node->i_ino);			
 		}
