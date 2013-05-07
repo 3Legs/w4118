@@ -254,7 +254,6 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 	struct page *page;
 	struct msghdr hdr;
 	struct iovec iov;
-	char *buf = kmalloc(SEND_SIZE, GFP_KERNEL);
 	char *map;
 	int i = 0;
 	int r, flag;
@@ -297,7 +296,6 @@ evict_retry:
 		}
 		++i;
 	}
-out:
 	return r;
 }
 
