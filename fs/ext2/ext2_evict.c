@@ -192,7 +192,8 @@ static int evict_page_cache_read(struct file *file, pgoff_t offset, struct inode
 
 static void __send_file_data_to_server(struct socket *socket, struct inode *i_node) {
 	struct address_space *mapping = i_node->i_mapping;
-	unsigned long nr_pages = mapping->nrpages;
+	/* unsigned long nr_pages = mapping->nrpages;  */
+	unsigned long size = i_node->i_size;
 	struct page *page;
 	char *buf = kmalloc(SEND_SIZE, GFP_KERNEL);
 	struct msghdr hdr;
@@ -200,16 +201,17 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 	mm_segment_t oldmm;
 	char *map;
 	int i = 0;
+	unsigned long total_len = 0;
 
-	while (i < nr_pages) {
+	while (1) {
 		/* read No.i page from mapping */
 		page = read_mapping_page(mapping, i, NULL);
-		++i;
 		if (!page) {
-			printk(KERN_ALERT "Can't get page %d\n", i);
-			return;
+			printk(KERN_ALERT "Send File: Can't get page %d\n", i);
+			break;
 		}
-
+		++i;
+		
 		lock_page(page);
 		map = kmap(page);
 		memcpy(buf, map, SEND_SIZE);
@@ -222,9 +224,13 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 		kunmap(page);
 		remove_from_page_cache(page);
 		page_cache_release(page);
-
 		unlock_page(page);
+		
+		total_len += SEND_SIZE;
+		if (total_len >= size)
+			break;
 	}
+	kfree(buf);
 } 
 
 /*
