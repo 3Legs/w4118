@@ -254,6 +254,7 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 	struct page *page;
 	struct msghdr hdr;
 	struct iovec iov;
+	char *buf = kmalloc(SEND_SIZE+1, GFP_KERNEL);
 	char *map;
 	int i = 0;
 	int r, flag;
@@ -261,41 +262,47 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 
 	while (1) {
 
-		
-evict_retry:
-		page = find_lock_page(mapping, i);
-		if (!page) {
-			/* printk(KERN_ALERT "Can't find page\n"); */
-			/* r =  -ENOMEM; */
-			evict_page_cache_read(NULL, i, i_node);
-			goto evict_retry;
-		}
-
-		/* lock_page(page); */
-		map = kmap(page);
-
-		__prepare_msghdr(&hdr, &iov, map, SEND_SIZE, MSG_WAITALL);
+		__prepare_msghdr(&hdr, &iov, buf, SEND_SIZE, MSG_WAITALL);
 		len = sock_recvmsg(socket, &hdr, SEND_SIZE, MSG_WAITALL);
+		if (len <= 0) {
+			printk(KERN_ALERT "recv error %d\n", len);
+			goto out;
+		}
 		if (len < SEND_SIZE ) {
 			flag = 1;
 		}
+		buf[len] = '\0';
+		printk(KERN_ALERT "%s", buf);
+		
+/* evict_retry: */
+		/* page = find_lock_page(mapping, i); */
+		/* if (!page) { */
+		/* 	/\* printk(KERN_ALERT "Can't find page\n"); *\/ */
+		/* 	/\* r =  -ENOMEM; *\/ */
+		/* 	evict_page_cache_read(NULL, i, i_node); */
+		/* 	goto evict_retry; */
+		/* } */
 
-		total_len += len;
-		mark_page_accessed(page);
-		kunmap(page);
-		unlock_page(page);
-		if (flag) {
-			if (total_len == i_node->i_size) {
-				r = CLFS_OK;
-			}
-			else {
-				r = CLFS_ERROR;
-			}
-			printk(KERN_ALERT "Total: %d\n", total_len);
-			break;
-		}
+		/* /\* lock_page(page); *\/ */
+		/* map = kmap(page); */
+		/* memcpy(map, buf, len); */
+		/* total_len += len; */
+		/* mark_page_accessed(page); */
+		/* kunmap(page); */
+		/* unlock_page(page); */
+		/* if (flag) { */
+		/* 	if (total_len == i_node->i_size) { */
+		/* 		r = CLFS_OK; */
+		/* 	} */
+		/* 	else { */
+		/* 		r = CLFS_ERROR; */
+		/* 	} */
+		/* 	printk(KERN_ALERT "Total: %d\n", total_len); */
+		/* 	break; */
+		/* } */
 		++i;
 	}
+out:
 	return r;
 }
 
