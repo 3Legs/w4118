@@ -261,11 +261,7 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 	int len, total_len = 0;
 
 	while (1) {
-		__prepare_msghdr(&hdr, &iov, buf, SEND_SIZE, MSG_WAITALL);
-		len = sock_recvmsg(socket, &hdr, SEND_SIZE, MSG_WAITALL);
-		if (len < SEND_SIZE ) {
-			flag = 1;
-		}
+
 		
 evict_retry:
 		page = find_lock_page(mapping, i);
@@ -279,7 +275,12 @@ evict_retry:
 		/* lock_page(page); */
 		map = kmap(page);
 
-		memcpy(map, buf, len);
+		__prepare_msghdr(&hdr, &iov, map, SEND_SIZE, MSG_WAITALL);
+		len = sock_recvmsg(socket, &hdr, SEND_SIZE, MSG_WAITALL);
+		if (len < SEND_SIZE ) {
+			flag = 1;
+		}
+
 		total_len += len;
 		mark_page_accessed(page);
 		kunmap(page);
@@ -297,7 +298,6 @@ evict_retry:
 		++i;
 	}
 out:
-	kfree(buf);
 	return r;
 }
 
