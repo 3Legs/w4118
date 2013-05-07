@@ -194,18 +194,19 @@ static int evict_page_cache_read(struct file *file, pgoff_t offset, struct inode
 
 static void __send_file_data_to_server(struct socket *socket, struct inode *i_node) {
 	struct address_space *mapping = i_node->i_mapping;
+	unsigned long nr_pages = mapping->nrpages;
 	struct page *page;
 	char *buf = kmalloc(SEND_SIZE, GFP_KERNEL);
 	struct msghdr hdr;
 	struct iovec iov;
 	mm_segment_t oldmm;
 	char *map;
-	int i = -1;
+	int i = 0;
 
-	while (1) {
-		++i;
+	while (i < nr_pages) {
 		/* read No.i page from mapping */
 		page = read_mapping_page(mapping, i, NULL);
+		++i;
 		if (!page) {
 			printk(KERN_ALERT "Can't get page %d\n", i);
 			return;
