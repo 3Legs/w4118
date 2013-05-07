@@ -244,6 +244,7 @@ static enum clfs_status __read_file_data_from_server(struct socket *socket, stru
 	char *buf = kmalloc(SEND_SIZE, GFP_KERNEL);
 	char *map;
 	int i = 0;
+	int k;
 	enum clfs_status r;
 	unsigned long nr_pages = mapping->nrpages;
 	unsigned long size = i_node->i_size;
@@ -258,11 +259,13 @@ static enum clfs_status __read_file_data_from_server(struct socket *socket, stru
 			goto read_out;
 		if (total_len + len > size)
 			len = size - total_len;
+		for (k=0; k<len ;k++){
+			printk(KERN_ALERT "%c",buf[k]);
+		}
+		printk(KERN_ALERT "\n");
 evict_retry:
 		page = find_lock_page(mapping, i);
 		if (!page) {
-			/* printk(KERN_ALERT "Can't find page\n"); */
-			/* r =  -ENOMEM; */
 			evict_page_cache_read(NULL, i, i_node);
 			goto evict_retry;
 		}
