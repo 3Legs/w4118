@@ -143,17 +143,22 @@ static void __send_response(struct socket *socket, enum clfs_status res) {
 	set_fs(oldmm);
 }
 
-static int __read_response(struct socket *socket) {
-	int response = 0;
+static enum clfs_status __read_response(struct socket *socket) {
+	enum clfs_status response = CLFS_OK;
 	struct msghdr hdr;
 	struct iovec iov;
 	int len;
+	mm_segment_t oldmm;
 
-	__prepare_msghdr(&hdr, &iov, (void *) &response, sizeof(int), MSG_DONTWAIT);
-	
-	len = sock_recvmsg(socket, &hdr, sizeof(int), 0);
-	if (len)
+	__prepare_msghdr(&hdr, &iov, &response, sizeof(enum clfs_status), MSG_WAITALL);
+	oldmm = get_fs();
+	set_fs(KERNEL_DS);
+	len = sock_recvmsg(socket, &hdr, sizeof(enum clfs_status), MSG_WAITALL);
+	set_fs(oldmm);
+
+	if (len > 0)
 		return response;
+	printk(KERN_ALERT "Error in read response\n");
 	return CLFS_ERROR;
 }
 
@@ -243,25 +248,28 @@ static enum clfs_status __read_file_data_from_server(struct socket *socket, stru
 	char *buf = kmalloc(SEND_SIZE, GFP_KERNEL);
 	char *map;
 	int i = 0;
-	int k;
 	enum clfs_status r;
 	unsigned long nr_pages = mapping->nrpages;
 	unsigned long size = i_node->i_size;
 	unsigned long len, total_len = 0;
+	mm_segment_t oldmm;
 
 	__prepare_msghdr(&hdr, &iov, buf, SEND_SIZE, MSG_WAITALL);
-	len = sock_recvmsg(socket, &hdr, SEND_SIZE, MSG_WAITALL);
+
 	while (1) {
+		oldmm = get_fs();
+		set_fs(KERNEL_DS);
+		len = sock_recvmsg(socket, &hdr, SEND_SIZE, MSG_WAITALL);
+		set_fs(oldmm);
+
 		if (i >= nr_pages)
 			printk(KERN_ALERT "Page overflow %d\n", i);
-		if (len <= 0)
+		if (len < 0) {
+			printk(KERN_ALERT "Receive error %d\n", i);
 			goto read_out;
+		}
 		if (total_len + len > size)
 			len = size - total_len;
-		for (k=0; k<len ;k++){
-			printk(KERN_ALERT "%c",buf[k]);
-		}
-		printk(KERN_ALERT "\n");
 evict_retry:
 		page = find_lock_page(mapping, i);
 		if (!page) {
@@ -280,9 +288,6 @@ evict_retry:
 			goto read_out;
 
 		++i;
-		__prepare_msghdr(&hdr, &iov, buf, SEND_SIZE, MSG_WAITALL);
-		len = sock_recvmsg(socket, &hdr, SEND_SIZE, MSG_WAITALL);
-
 	}
 read_out:
 	kfree(buf);
@@ -355,7 +360,6 @@ int ext2_fetch(struct inode *i_node)
 	struct sockaddr_in *server_addr = NULL;
 	struct socket *socket;
 	int r;
-	enum clfs_status res;
 
 	printk(KERN_ALERT "About to fetch file: %lu\n", i_node->i_ino);
 	r = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &socket);
@@ -379,14 +383,14 @@ int ext2_fetch(struct inode *i_node)
 	printk(KERN_ALERT "Socket connected, about to send request\n");
 
 	__send_request(socket, server_addr, i_node, CLFS_GET);
-	res = __read_response(socket);
-	if (res == CLFS_OK) {
+	r = __read_response(socket);
+	if (r == CLFS_OK) {
 		printk(KERN_ALERT "Got OK reponse, about to read file from server\n");
-		res = __read_file_data_from_server(socket, i_node);
-		if (res == CLFS_OK)
+		r = __read_file_data_from_server(socket, i_node);
+		if (r == CLFS_OK)
 			printk(KERN_ALERT "Read file success!\n");
-		__send_response(socket, res);
-	} else if (res == CLFS_ACCESS) {
+		__send_response(socket, (enum clfs_status) r);
+	} else if (r == CLFS_ACCESS) {
 		printk(KERN_ALERT "Can't access file %lu from server\n", i_node->i_ino);	
 		r = -1;
 	}
