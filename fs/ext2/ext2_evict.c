@@ -400,6 +400,7 @@ int ext2_evict(struct inode *i_node) {
 evict_release_out:
 	if (socket)
 		sock_release(socket);
+	printk(KERN_ALERT "Evict Page size: %d\n", (int)sizeof(struct evict_page));
 	return r;
 }
 
