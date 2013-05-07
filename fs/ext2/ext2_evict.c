@@ -261,16 +261,15 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 	int len, total_len = 0;
 
 	while (1) {
-
+		__send_response(socket, CLFS_NEXT);
 		__prepare_msghdr(&hdr, &iov, buf, SEND_SIZE, MSG_WAITALL);
 		len = sock_recvmsg(socket, &hdr, SEND_SIZE, MSG_WAITALL);
 		if (len <= 0) {
 			printk(KERN_ALERT "recv error %d\n", len);
+			r = CLFS_ERROR;
 			goto out;
 		}
-		if (len < SEND_SIZE ) {
-			flag = 1;
-		}
+
 		buf[len] = '\0';
 		printk(KERN_ALERT "%s", buf);
 		
@@ -300,6 +299,11 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 		/* 	printk(KERN_ALERT "Total: %d\n", total_len); */
 		/* 	break; */
 		/* } */
+		if (len < SEND_SIZE) {
+			r = CLFS_OK;
+			goto out;
+		}
+
 		++i;
 	}
 out:
