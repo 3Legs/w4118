@@ -195,33 +195,27 @@ static int evict_page_cache_read(struct file *file, pgoff_t offset, struct inode
 static void __send_file_data_to_server(struct socket *socket, struct inode *i_node) {
 	struct address_space *mapping = i_node->i_mapping;
 	struct page *page;
+	char *buf = kmalloc(SEND_SIZE, GFP_KERNEL);
 	struct msghdr hdr;
 	struct iovec iov;
 	mm_segment_t oldmm;
-	struct evict_page *epage;
-	int nr_pages;
 	char *map;
-	int i;
-	int response;
+	int i = -1;
 
-	/* get total number of pages of the given file*/
-	/*TODO: we may not want hard-code it*/
-	nr_pages = (i_node->i_size / SEND_SIZE) + 1;
-	for (i = 0; i < nr_pages; ++i) {
+	while (1) {
+		++i;
 		/* read No.i page from mapping */
 		page = read_mapping_page(mapping, i, NULL);
-		lock_page(page);
-		map = kmap(page);
-		epage = kmalloc(sizeof(struct evict_page), GFP_KERNEL);
-		memcpy(epage->data, map, SEND_SIZE);
-		epage->end = 0;
-
-		/* if last, we need to notify server */
-		if (i == (nr_pages - 1)) {
-			epage->end = (i_node->i_size) - (i_node->i_size / SEND_SIZE) * SEND_SIZE;
+		if (!page) {
+			printk(KERN_ALERT "Can't get page %d\n", i);
+			return;
 		}
 
-		__prepare_msghdr(&hdr, &iov, epage, sizeof(struct evict_page), MSG_DONTWAIT);
+		lock_page(page);
+		map = kmap(page);
+		memcpy(buf, map, SEND_SIZE);
+
+		__prepare_msghdr(&hdr, &iov, buf, SEND_SIZE, 0);
 		oldmm = get_fs();
 		set_fs(KERNEL_DS);
 		sock_sendmsg(socket, &hdr, sizeof(struct evict_page));
@@ -231,14 +225,6 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 		page_cache_release(page);
 
 		unlock_page(page);
-
-		/* if not last, we need to sync by reading a response*/
-		response = __read_response(socket);
-		if (response == CLFS_END) {
-			printk(KERN_ALERT "All pages sent, %d in total\n", i);
-			return;
-		}
-
 	}
 } 
 
