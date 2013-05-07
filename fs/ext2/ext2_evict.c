@@ -254,22 +254,16 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 	struct page *page;
 	struct msghdr hdr;
 	struct iovec iov;
-	struct evict_page *epage = kmalloc(sizeof(struct evict_page), GFP_KERNEL);
+	char *buf = kmalloc(SEND_SIZE, GFP_KERNEL);
 	char *map;
 	int i = 0;
 	int r, flag;
-	int len;
+	int len, total_len = 0;
 
 	while (1) {
-		__prepare_msghdr(&hdr, &iov, epage, sizeof(struct evict_page), MSG_WAITALL);
-		len = sock_recvmsg(socket, &hdr, sizeof(struct evict_page), MSG_WAITALL);
-		if (len < sizeof(struct evict_page)) {
-			printk(KERN_ALERT "Receive error");
-			r = CLFS_ERROR;
-			goto out;
-		}
-
-		if (epage->end < SEND_SIZE) {
+		__prepare_msghdr(&hdr, &iov, buf, SEND_SIZE, MSG_WAITALL);
+		len = sock_recvmsg(socket, &hdr, SEND_SIZE, MSG_WAITALL);
+		if (len < SEND_SIZE ) {
 			flag = 1;
 		}
 		
@@ -285,18 +279,25 @@ evict_retry:
 		/* lock_page(page); */
 		map = kmap(page);
 
-		memcpy(map, epage->data, epage->end); 
+		memcpy(map, buf, len);
+		total_len += len;
 		mark_page_accessed(page);
 		kunmap(page);
 		unlock_page(page);
 		if (flag) {
-			r = CLFS_OK;
+			if (total_len == i_node->i_size) {
+				r = CLFS_OK;
+			}
+			else {
+				r = CLFS_ERROR;
+			}
+			printk(KERN_ALERT "Total: %d\n", total_len);
 			break;
 		}
 		++i;
 	}
 out:
-	kfree(epage);
+	kfree(buf);
 	return r;
 }
 
