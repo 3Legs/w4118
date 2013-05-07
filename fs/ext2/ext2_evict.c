@@ -35,6 +35,7 @@
 #define d(x) printk(KERN_ALERT "%d\n", x)
 #define test_and_free(x) if(x) kfree(x)
 #define SEND_SIZE 4096
+#define RECV_SIZE 256
 
 enum clfs_status {
 	CLFS_OK = 0,            /* Success */
@@ -191,6 +192,20 @@ static int evict_page_cache_read(struct file *file, pgoff_t offset, struct inode
 	return ret;
 }
 
+static inline struct page* __evict_get_page(struct inode *i_node, int i) {
+	struct page *page;
+	struct address_space *mapping = i_node->i_mapping;
+
+evict_retry:
+	page = find_lock_page(mapping, i);
+	if (!page) {
+		evict_page_cache_read(NULL, i, i_node);
+		goto evict_retry;
+	}
+	return page;
+}
+
+
 static void __send_file_data_to_server(struct socket *socket, struct inode *i_node) {
 	struct address_space *mapping = i_node->i_mapping;
 	unsigned long nr_pages = mapping->nrpages;
@@ -240,53 +255,46 @@ static enum clfs_status __read_file_data_from_server(struct socket *socket, stru
 	struct page *page;
 	struct msghdr hdr;
 	struct iovec iov;
-	char *buf = kmalloc(SEND_SIZE, GFP_KERNEL);
+	char c;
 	char *map;
 	int i = 0;
 	int k;
 	enum clfs_status r;
 	unsigned long nr_pages = mapping->nrpages;
 	unsigned long size = i_node->i_size;
-	unsigned long len, total_len = 0;
+	unsigned long len = 0, total_len = 0;
 
-	__prepare_msghdr(&hdr, &iov, buf, SEND_SIZE, MSG_WAITALL);
-	len = sock_recvmsg(socket, &hdr, SEND_SIZE, MSG_WAITALL);
+	__prepare_msghdr(&hdr, &iov, &c, sizeof(char), MSG_WAITALL);
+	page = __evict_get_page(i_node, i);
+	map = kmap(page);
+
 	while (1) {
-		if (i >= nr_pages)
-			printk(KERN_ALERT "Page overflow %d\n", i);
-		if (len <= 0)
+		k = sock_recvmsg(socket, &hdr, sizeof(char), MSG_WAITALL);
+		if (k < 0) {
+			printk(KERN_ALERT "Recv error %d\n", k);
 			goto read_out;
-		if (total_len + len > size)
-			len = size - total_len;
-		for (k=0; k<len ;k++){
-			printk(KERN_ALERT "%c",buf[k]);
 		}
-		printk(KERN_ALERT "\n");
-evict_retry:
-		page = find_lock_page(mapping, i);
-		if (!page) {
-			evict_page_cache_read(NULL, i, i_node);
-			goto evict_retry;
-		}
-
-		map = kmap(page);
-		memcpy(map, buf, len); 
-		mark_page_accessed(page);
-		kunmap(page);
-		unlock_page(page);
 		
-		total_len += len;
+		memcpy(map+len, &c, 1);
+		len++;
+		total_len++;
 		if (total_len >= size)
 			goto read_out;
 
-		++i;
-		__prepare_msghdr(&hdr, &iov, buf, SEND_SIZE, MSG_WAITALL);
-		len = sock_recvmsg(socket, &hdr, SEND_SIZE, MSG_WAITALL);
-
+		if (len == SEND_SIZE) {
+			len = 0;
+			mark_page_accessed(page);
+			kunmap(page);
+			unlock_page(page);
+			i++;
+			page = __evict_get_page(i_node, i);
+			map = kmap(page);
+		}
 	}
 read_out:
-	kfree(buf);
-
+	mark_page_accessed(page);
+	kunmap(page);
+	unlock_page(page);
 	if (total_len != size) {
 		printk(KERN_ALERT "File length error %lu, %lu\n", total_len, size);
 		r = CLFS_ERROR;
