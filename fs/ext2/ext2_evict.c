@@ -73,8 +73,7 @@ struct evict_page {
 DEFINE_MUTEX(evict_mutex);
 
 static inline void __prepare_msghdr(struct msghdr *hdr, struct iovec * iov, void *data, size_t len, int flags) {
-	
-	iov = kmalloc(sizeof(struct iovec), GFP_KERNEL);
+
 	iov->iov_base = data;
 	iov->iov_len = len;
 	
