@@ -145,7 +145,7 @@ static void __send_response(struct socket *socket, enum clfs_status res) {
 }
 
 static enum clfs_status __read_response(struct socket *socket) {
-	clfs_status response = CLFS_OK;
+	enum clfs_status response = CLFS_OK;
 	struct msghdr hdr;
 	struct iovec iov;
 	int len;
