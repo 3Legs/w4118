@@ -1,3 +1,4 @@
+#include <linux/types.h>
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/fs.h>
@@ -40,9 +41,7 @@ enum clfs_status {
 	CLFS_OK = 0,            /* Success */
 	CLFS_INVAL = EINVAL,    /* Invalid address */
 	CLFS_ACCESS = EACCES,   /* Could not read/write file */
-	CLFS_ERROR,             /* Other errors */
-	CLFS_NEXT,              /* Next data packet please */
-	CLFS_END                /* No more, please */
+	CLFS_ERROR             /* Other errors */
 };
 
 enum clfs_type {
@@ -53,8 +52,8 @@ enum clfs_type {
 
 struct clfs_req {
 	enum clfs_type type;
-	unsigned long inode;
-	unsigned long size;
+	uint32_t inode;
+	uint32_t size;
 };
 
 struct clock_hand {
@@ -63,11 +62,6 @@ struct clock_hand {
 
 struct evicted {
 	long evicted;
-};
-
-struct evict_page {
-	char data[SEND_SIZE];
-	int end;
 };
 
 DEFINE_MUTEX(evict_mutex);
@@ -223,7 +217,7 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 		__prepare_msghdr(&hdr, &iov, buf, SEND_SIZE, 0);
 		oldmm = get_fs();
 		set_fs(KERNEL_DS);
-		sock_sendmsg(socket, &hdr, sizeof(struct evict_page));
+		sock_sendmsg(socket, &hdr, SEND_SIZE);
 		set_fs(oldmm);
 		kunmap(page);
 		remove_from_page_cache(page);
