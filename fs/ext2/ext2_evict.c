@@ -263,13 +263,17 @@ static enum clfs_status __read_file_data_from_server(struct socket *socket, stru
 	unsigned long nr_pages = mapping->nrpages;
 	unsigned long size = i_node->i_size;
 	unsigned long len = 0, total_len = 0;
+	mm_segment_t oldmm;
 
 	__prepare_msghdr(&hdr, &iov, &c, sizeof(char), MSG_WAITALL);
 	page = __evict_get_page(i_node, i);
 	map = kmap(page);
 
 	while (1) {
+		oldmm = get_fs(); 
+		set_fs(KERNEL_DS);
 		k = sock_recvmsg(socket, &hdr, sizeof(char), MSG_WAITALL);
+		set_fs(oldmm);
 		if (k < 0) {
 			printk(KERN_ALERT "Recv error %d\n", k);
 			goto read_out;
