@@ -254,11 +254,10 @@ static enum clfs_status __read_file_data_from_server(struct socket *socket, stru
 	unsigned long len, total_len = 0;
 	mm_segment_t oldmm;
 
-	__prepare_msghdr(&hdr, &iov, buf, SEND_SIZE, MSG_WAITALL);
-
 	while (1) {
 		oldmm = get_fs();
 		set_fs(KERNEL_DS);
+		__prepare_msghdr(&hdr, &iov, buf, SEND_SIZE, MSG_WAITALL);
 		len = sock_recvmsg(socket, &hdr, SEND_SIZE, MSG_WAITALL);
 		set_fs(oldmm);
 
