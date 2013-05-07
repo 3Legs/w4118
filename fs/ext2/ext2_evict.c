@@ -144,18 +144,21 @@ static void __send_response(struct socket *socket, enum clfs_status res) {
 	set_fs(oldmm);
 }
 
-static int __read_response(struct socket *socket) {
-	int response = 0;
+static enum clfs_status __read_response(struct socket *socket) {
+	clfs_status response = CLFS_OK;
 	struct msghdr hdr;
 	struct iovec iov;
 	int len;
 
-	__prepare_msghdr(&hdr, &iov, (void *) &response, sizeof(int), MSG_DONTWAIT);
+	__prepare_msghdr(&hdr, &iov, (void *) &response,
+			 sizeof(enum clfs_status), MSG_WAITALL);
 	
-	len = sock_recvmsg(socket, &hdr, sizeof(int), 0);
-	if (len)
+	len = sock_recvmsg(socket, &hdr,
+			   sizeof(enum clfs_status), MSG_WAITALL);
+	if (len == sizeof(enum clfs_status))
 		return response;
-	return CLFS_ERROR;
+	else
+		return CLFS_ERROR;
 }
 
 
@@ -198,21 +201,23 @@ static void __send_file_data_to_server(struct socket *socket, struct inode *i_no
 	struct msghdr hdr;
 	struct iovec iov;
 	mm_segment_t oldmm;
-	struct evict_page *epage;
+	struct evict_page *epage = kmalloc(sizeof(struct evict_page),
+					   GFP_KERNEL);
 	int nr_pages;
 	char *map;
 	int i;
-	int response;
+	enum clfs_status response;
 
 	/* get total number of pages of the given file*/
 	/*TODO: we may not want hard-code it*/
 	nr_pages = (i_node->i_size / SEND_SIZE) + 1;
 	for (i = 0; i < nr_pages; ++i) {
-		/* read No.i page from mapping */
+
+		memset(epage, 0, sizeof(struct evict_page));
+
 		page = read_mapping_page(mapping, i, NULL);
 		lock_page(page);
 		map = kmap(page);
-		epage = kmalloc(sizeof(struct evict_page), GFP_KERNEL);
 		memcpy(epage->data, map, SEND_SIZE);
 		epage->end = 0;
 
@@ -254,7 +259,8 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 	struct page *page;
 	struct msghdr hdr;
 	struct iovec iov;
-	struct evict_page *epage;
+	struct evict_page *epage = kmalloc(sizeof(struct evict_page),
+					   GFP_KERNEL);
 	int nr_pages;
 	char *map;
 	int i = 0;
@@ -263,15 +269,17 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 
 	nr_pages = (i_node->i_size / SEND_SIZE) + 1;
 	while (1) {
-		if (i > nr_pages) {
+
+		if (i > nr_pages + 1) {
 			printk(KERN_ALERT "Page number overflow %d\n", i);
 			r = CLFS_ERROR;
 			goto read_out_with_no_lock;
 		}
 
-		epage = kmalloc(sizeof(struct evict_page), GFP_KERNEL);
+
 		__prepare_msghdr(&hdr, &iov, epage, sizeof(struct evict_page), MSG_WAITALL);
 		len = sock_recvmsg(socket, &hdr, sizeof(struct evict_page), MSG_WAITALL);
+
 		if (len < sizeof(struct evict_page)) {
 			printk(KERN_ALERT "Receving error\n");
 			r = CLFS_ERROR;
@@ -279,9 +287,10 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 			goto read_out_with_no_lock;
 			
 		}
+
 		printk(KERN_ALERT "Receive page %d with end: %d\n", i, epage->end);
 
-		if (epage->end == -1) {
+		if (epage->end == -1) { /* with zero buffer*/
 			__send_response(socket, CLFS_END);
 			goto read_out_regular_out;
 		}
@@ -293,11 +302,14 @@ static int __read_file_data_from_server(struct socket *socket, struct inode *i_n
 			goto read_out_with_no_lock;
 		}
 
+
 		if (epage->end) {
 			buflen = epage->end;
+			__send_response(socket, CLFS_END);
 		} else {
 			buflen = SEND_SIZE;
-			printk(KERN_ALERT "ready to receive page %d\n", i+1);
+			__send_response(socket, CLFS_NEXT);
+
 		}
 		
 evict_retry:
@@ -321,11 +333,9 @@ evict_retry:
 
 		/* if last, we are done */
 		if (epage->end) {
-			__send_response(socket, CLFS_END);
 			goto read_out_regular_out;
 		}
-		__send_response(socket, CLFS_NEXT);
-		printk(KERN_ALERT "Loop end after storing page %d\n", i);
+		printk(KERN_ALERT "ready to receive page %d\n", i+1);
 		++i;
 	}
 read_out_regular_out:
