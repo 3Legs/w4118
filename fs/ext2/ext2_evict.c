@@ -166,7 +166,7 @@ static enum clfs_status __read_response(struct socket *socket) {
  */
 
 
-static int evict_page_cache_read(struct file *file, pgoff_t offset, struct inode *inode)
+static int evict_page_cache_read(pgoff_t offset, struct inode *inode)
 {
 	struct address_space *mapping = inode->i_mapping;
 	struct page *page; 
@@ -179,7 +179,7 @@ static int evict_page_cache_read(struct file *file, pgoff_t offset, struct inode
 
 		ret = add_to_page_cache_lru(page, mapping, offset, GFP_KERNEL);
 		if (ret == 0)
-			ret = mapping->a_ops->readpage(file, page);
+			ret = mapping->a_ops->readpage(NULL, page);
 		else if (ret == -EEXIST)
 			ret = 0; /* losing race to add is OK */
 
@@ -276,7 +276,7 @@ static enum clfs_status __read_file_data_from_server(struct socket *socket, stru
 evict_retry:
 		page = find_lock_page(mapping, i);
 		if (!page) {
-			evict_page_cache_read(NULL, i, i_node);
+			evict_page_cache_read(i, i_node);
 			goto evict_retry;
 		}
 
