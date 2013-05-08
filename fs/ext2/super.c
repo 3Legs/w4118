@@ -433,9 +433,8 @@ static int kget_num(int i)
 {
 	int ret = 1;
 	int p;
-	for (p = 0; p < i; ++p) {
+	for (p = 0; p < i; ++p)
 		ret *= 10;
-	}
 	return ret;
 }
 
@@ -444,16 +443,15 @@ static int kparse_int(char *name)
 	int ret = 0;
 	int i, len;
 	for (i = 0; name[i] != '\0'; ++i) {
-		if (name[i] < 48 || name[i] > 57) {
+		if (name[i] < 48 || name[i] > 57)
 			return -1;
-		}
 	}
 
 	len = i;
 
-	for (i = 0; i < len; ++i) {
+	for (i = 0; i < len; ++i)
 		ret += (int)(name[i] - 48) * kget_num(len - i - 1);
-	}
+
 	return ret;
 }
 
@@ -474,18 +472,16 @@ static void kget_ip_port(char *p, char **ip, int *port)
 	int i;
 	char *ipmem;
 
-	while (p[len_ip] != ':') {
+	while (p[len_ip] != ':')
 		++len_ip;
-	}
 
-	while (p[len_ip + 1 + len_port] != '\0') {
+	while (p[len_ip + 1 + len_port] != '\0')
 		++len_port;
-	}
 
 	ipmem = kmalloc((len_ip+1) * sizeof(char), GFP_KERNEL);
-	for (i = 0; i < len_ip; ++i) {
+	for (i = 0; i < len_ip; ++i)
 		ipmem[i] = p[i];
-	}
+
 	ipmem[len_ip] = '\0';
 	*ip = ipmem;
 

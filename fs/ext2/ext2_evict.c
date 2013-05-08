@@ -34,7 +34,7 @@
 #include "xip.h"
 
 #define d(x) printk(KERN_ALERT "%d\n", x)
-#define test_and_free(x) if(x) kfree(x)
+#define test_and_free(x) if (x) kfree(x)
 #define SEND_SIZE 4096
 
 enum clfs_status {
@@ -169,7 +169,7 @@ static enum clfs_status __read_response(struct socket *socket)
 
 /*
  * send file data through socket
- * 1. store the hash code of file data 
+ * 1. store the hash code of file data
  * 2. encrypt data for safety and stored the key
  * 3. send
  * 4. handle local data (delete page cache and reclaim blocks)
@@ -269,9 +269,9 @@ static enum clfs_status __read_file_data_from_server(struct socket *socket,
 
 	while (1) {
 		buflen = SEND_SIZE;
-		if (total_len + SEND_SIZE > size) {
+		if (total_len + SEND_SIZE > size)
 			buflen = size - total_len;
-		}
+
 		oldmm = get_fs();
 		set_fs(KERNEL_DS);
 		__prepare_msghdr(&hdr, &iov, buf, buflen, 0);

@@ -383,7 +383,7 @@ static int ext2_alloc_blocks(struct inode *inode,
 		int utility = (used_blocks * 1000) / total_blocks;
 
 #ifdef EVICT_DEBUG
-		printk(KERN_ALERT "used: %d total: %d  utility: %d water_high: %d\n", 
+		printk(KERN_ALERT "used: %d total: %d  utility: %d water_high: %d\n",
 			used_blocks, total_blocks, utility, 10 * ext2_sup->water_high);
 #endif
 
@@ -393,7 +393,7 @@ static int ext2_alloc_blocks(struct inode *inode,
 			evict_mutex_unlock();
 		}
 	}
-	
+
 	/*
 	 * Here we try to allocate the requested multiple blocks at once,
 	 * on a best-effort basis.
