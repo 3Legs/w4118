@@ -251,14 +251,18 @@ static enum clfs_status __read_file_data_from_server(struct socket *socket, stru
 	enum clfs_status r;
 	unsigned long nr_pages = mapping->nrpages;
 	unsigned long size = i_node->i_size;
-	unsigned long len, total_len = 0;
+	unsigned long buflen, len, total_len = 0;
 	mm_segment_t oldmm;
 
 	while (1) {
+		buflen = SEND_SIZE;
+		if (total_len + SEND_SIZE > size) {
+			buflen = size - total_len;
+		}
 		oldmm = get_fs();
 		set_fs(KERNEL_DS);
-		__prepare_msghdr(&hdr, &iov, buf, SEND_SIZE, MSG_WAITALL);
-		len = sock_recvmsg(socket, &hdr, SEND_SIZE, MSG_WAITALL);
+		__prepare_msghdr(&hdr, &iov, buf, buflen, 0);
+		len = sock_recvmsg(socket, &hdr, buflen, MSG_WAITALL);
 		set_fs(oldmm);
 
 		if (i >= nr_pages)
