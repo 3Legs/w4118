@@ -34,6 +34,7 @@
 #include "xip.h"
 
 #define SEND_SIZE 4096
+#define test_and_free(x) if (x) kfree(x)
 
 enum clfs_status {
 	CLFS_OK = 0,		/* Success */
@@ -273,7 +274,6 @@ __read_file_data_from_server(struct socket *socket, struct inode *i_node)
 	char *map;
 	int i = 0;
 	enum clfs_status r;
-	unsigned long nr_pages = mapping->nrpages;
 	unsigned long size = i_node->i_size;
 	unsigned long buflen, len, total_len = 0;
 	mm_segment_t oldmm;
