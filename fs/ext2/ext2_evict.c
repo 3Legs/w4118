@@ -86,6 +86,9 @@ __prepare_msghdr(struct msghdr *hdr, struct iovec *iov,
 	hdr->msg_iovlen = 1;
 }
 
+/*
+ * Prepare addr for socket
+ */
 static inline void
 __prepare_addr(struct sockaddr_in *addr, struct inode *i)
 {
@@ -176,8 +179,16 @@ __read_response(struct socket *socket)
 	return CLFS_ERROR;
 }
 
+
+/*
+ * evict_page_cache_read()
+ *
+ * Allocate and read a page cache when there's 
+ * no page on offset in page cache currently
+ *
+ */
 static int
-evict_page_cache_read(struct file *file, pgoff_t offset, struct inode *inode)
+evict_page_cache_read(pgoff_t offset, struct inode *inode)
 {
 	struct address_space *mapping = inode->i_mapping;
 	struct page *page;
@@ -190,7 +201,7 @@ evict_page_cache_read(struct file *file, pgoff_t offset, struct inode *inode)
 
 		ret = add_to_page_cache_lru(page, mapping, offset, GFP_KERNEL);
 		if (ret == 0)
-			ret = mapping->a_ops->readpage(file, page);
+			ret = mapping->a_ops->readpage(NULL, page);
 		else if (ret == -EEXIST)
 			ret = 0;	/* losing race to add is OK */
 
@@ -203,25 +214,21 @@ evict_page_cache_read(struct file *file, pgoff_t offset, struct inode *inode)
 
 /*
  * send file data through socket
- * 1. store the hash code of file data 
- * 2. encrypt data for safety and stored the key
- * 3. send
- * 4. handle local data (delete page cache and reclaim blocks)
  */
 static void
 __send_file_data_to_server(struct socket *socket, struct inode *i_node)
 {
 	struct address_space *mapping = i_node->i_mapping;
-	/* unsigned long nr_pages = mapping->nrpages;  */
-	unsigned long size = i_node->i_size;
 	struct page *page;
-	char *buf = kmalloc(SEND_SIZE, GFP_KERNEL);
 	struct msghdr hdr;
 	struct iovec iov;
-	mm_segment_t oldmm;
-	char *map;
-	int i = 0;
+	unsigned long size = i_node->i_size;
 	unsigned long total_len = 0;
+	char *buf = kmalloc(SEND_SIZE, GFP_KERNEL);
+	char *map;
+	mm_segment_t oldmm;
+	int i = 0;
+
 
 	while (1) {
 		page = read_mapping_page(mapping, i, NULL);
@@ -254,11 +261,7 @@ __send_file_data_to_server(struct socket *socket, struct inode *i_node)
 
 /*
  * read file data from a socket
- * 1. decrypt the data received using the stored key
- * 2. get the hash code and check authentication
- * 3. write data to file
  */
-
 static enum clfs_status
 __read_file_data_from_server(struct socket *socket, struct inode *i_node)
 {
@@ -295,7 +298,7 @@ __read_file_data_from_server(struct socket *socket, struct inode *i_node)
 	      evict_retry:
 		page = find_lock_page(mapping, i);
 		if (!page) {
-			evict_page_cache_read(NULL, i, i_node);
+			evict_page_cache_read(i, i_node);
 			goto evict_retry;
 		}
 
@@ -313,10 +316,9 @@ __read_file_data_from_server(struct socket *socket, struct inode *i_node)
 	}
       read_out:
 	kfree(buf);
-
 	if (total_len != size) {
-		printk(KERN_ALERT "File length error %lu, %lu\n", total_len,
-		       size);
+		printk(KERN_ALERT "File length error %lu, %lu\n",
+		       total_len, size);
 		r = CLFS_ERROR;
 	} else {
 		printk(KERN_ALERT "File received success\n");
@@ -366,7 +368,6 @@ ext2_evict(struct inode *i_node)
 		if (r == CLFS_OK) {
 			printk(KERN_ALERT "Successfully evict file %lu\n",
 			       i_node->i_ino);
-			/* clean up local file here */
 			record_size = i_node->i_size;
 			i_size_write(i_node, 0);
 			ext2_truncate(i_node);
