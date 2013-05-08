@@ -509,7 +509,7 @@ static int parse_options (char * options,
 		int token;
 		if (!*p)
 			continue;
-		
+
 		if (kstrcmp(p, "srv", 3) == 0) {
 			char *ip;
 			int port;
